@@ -1,0 +1,23 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Streamlit (sube config, ignora secretos)
+.streamlit/secrets.toml
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Windows basura
+*:Zone.Identifier
+
+# Datos locales (si este se genera al correr)
+Data/historial.json
