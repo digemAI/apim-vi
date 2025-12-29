@@ -21,3 +21,4 @@ __pycache__/
 
 # Datos locales (si este se genera al correr)
 Data/historial.json
+*:Zone.Identifier
