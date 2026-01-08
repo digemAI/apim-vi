@@ -1,6 +1,9 @@
 # Entorno virtual
 venv/
 .venv/
+.DS_Store
+Data/*
+!Data/.gitkeep
 
 # Python
 __pycache__/
@@ -22,3 +25,6 @@ __pycache__/
 # Datos locales (si este se genera al correr)
 Data/historial.json
 *:Zone.Identifier
+Data/dojo_v3.pt
+venvne/
+Data/

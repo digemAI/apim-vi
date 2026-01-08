@@ -1,31 +1,21 @@
-# Permite usar anotaciones modernas de tipos
 from __future__ import annotations
-
-# Tipos para claridad (no afectan ejecución)
 from typing import Any, Dict, List, Tuple
-
-
-# =========================
-# DEFINICIÓN DE ESTADOS
-# =========================
 
 # Zonas financieras/emocionales
 ZONE_GREEN = "🟢"   # Control / estabilidad
-ZONE_YELLOW = "🟡"  # Fricción / alerta
-ZONE_RED = "🔴"     # Crisis / evento crítico
+ZONE_YELLOW = "🟡"  # Friccion / alerta
+ZONE_RED = "🔴"     # Crisis / evento critico
 
-# Tendencias (comparación contra el pasado)
+# Tendencias (comparacion contra el pasado)
 TREND_UP = "📈"     # Mejora
 TREND_FLAT = "➖"   # Estable
 TREND_DOWN = "📉"   # Empeora
 
 
-# =========================
-# PALABRAS CLAVE (HEURÍSTICAS)
-# =========================
-# Si aparece algo de aquí → casi seguro es rojo
+# Palabras clave  
+# Si aparece algo de aqui es rojo
 RED_KEYWORDS = {
-    "robo", "despido", "renuncia", "divorcio", "demanda", "fraude",
+    "robo", "despido", "renuncia", "divorcio", "demanda", "fraude", 
     "choque", "accidente", "hospital", "cirugía", "urgente", "deuda",
     "no puedo pagar", "mínimo", "embargo", "crisis"
 }
@@ -36,17 +26,13 @@ YELLOW_KEYWORDS = {
     "imprevisto", "retraso", "tensión", "preocupación", "preocupacion"
 }
 
-# Señales de control o planeación
+# Señales de control o planeacion
 GREEN_KEYWORDS = {
     "tranquilo", "tranquila", "controlado", "diversión", "diversion",
     "planeado", "planificado", "estacional", "enfocado", "bien"
 }
 
-
-# =========================
-# MAPA EMOCIÓN → ZONA
-# =========================
-# Traduce cómo te sentiste a una zona base
+# Traduce como te sentiste a una zona base
 EMOTION_TO_ZONE = {
     # verde
     "tranquilo": ZONE_GREEN,
@@ -78,44 +64,29 @@ EMOTION_TO_ZONE = {
     "desesperacion": ZONE_RED,
 }
 
-
-# =========================
-# FUNCIONES AUXILIARES
-# =========================
+# Funciones Auxiliares
 def _norm(s: str) -> str:
-    # Limpia texto: quita espacios y pasa a minúsculas
+
+    # Limpia texto, es decir, quita espacios y pasa a minusculas
     return (s or "").strip().lower()
 
-
+# Revisa si alguna palabra clave aparece en el texto
 def _contains_any(text: str, keywords: set[str]) -> bool:
-    # Revisa si alguna palabra clave aparece en el texto
     t = _norm(text)
     return any(k in t for k in keywords)
 
-
+# Convierte zona a numero para comparar
 def _zone_rank(z: str) -> int:
-    # Convierte zona a número para comparar
+
     # rojo = 0 (peor), amarillo = 1, verde = 2 (mejor)
     return {ZONE_RED: 0, ZONE_YELLOW: 1, ZONE_GREEN: 2}.get(z, 1)
 
-
+# Convierte número de vuelta a zona
 def _rank_to_zone(r: int) -> str:
-    # Convierte número de vuelta a zona
     return {0: ZONE_RED, 1: ZONE_YELLOW, 2: ZONE_GREEN}.get(r, ZONE_YELLOW)
 
-
-# =========================
-# CÁLCULO DE ZONA
-# =========================
+# Zona de un evento usando emocion declarada, palabras clave en descripcion y contexto
 def compute_zone(event: Dict[str, Any]) -> str:
-    """
-    Decide la zona de un evento usando:
-    - emoción declarada
-    - palabras clave en descripción y contexto
-
-    Regla clave:
-    👉 si algo huele a rojo, manda rojo.
-    """
     desc = _norm(event.get("description", ""))
     ctx = _norm(event.get("context", ""))
     amount = _norm(event.get("amount", ""))  # aún no pesa fuerte
@@ -125,7 +96,7 @@ def compute_zone(event: Dict[str, Any]) -> str:
     if _contains_any(desc, RED_KEYWORDS) or _contains_any(ctx, RED_KEYWORDS):
         return ZONE_RED
 
-    # 2) Zona base por emoción
+    # 2) Zona base por emocion
     if emo in EMOTION_TO_ZONE:
         base = EMOTION_TO_ZONE[emo]
     else:
@@ -138,20 +109,11 @@ def compute_zone(event: Dict[str, Any]) -> str:
     if _contains_any(desc, GREEN_KEYWORDS) or _contains_any(ctx, GREEN_KEYWORDS):
         base = _rank_to_zone(max(_zone_rank(base), _zone_rank(ZONE_GREEN)))
 
-    # 4) El monto aún no manda (MVP)
+    # 4) El monto aun no manda (MVP)
     return base
 
-
-# =========================
-# CÁLCULO DE TENDENCIA
-# =========================
+# Compara zona anterior vs actual para saber si mejora, empeora o sigue igual
 def compute_trend(prev_zone: str | None, current_zone: str) -> str:
-    """
-    Compara zona anterior vs actual:
-    - Mejora → 📈
-    - Empeora → 📉
-    - Igual → ➖
-    """
     if not prev_zone:
         return TREND_FLAT
 
@@ -164,19 +126,8 @@ def compute_trend(prev_zone: str | None, current_zone: str) -> str:
         return TREND_DOWN
     return TREND_FLAT
 
-
-# =========================
-# ZONA + TENDENCIA (PUENTE)
-# =========================
+#   Calcula zona y tendencia usando el ultimo evento registrado y la ultima zona guardada en memoria
 def evaluate_zone_and_trend(memory: Dict[str, Any]) -> Tuple[str, str]:
-    """
-    Calcula zona y tendencia usando:
-    - el último evento registrado
-    - la última zona guardada en memoria
-
-    Nota: aquí NO se guarda nada.
-    main.py decide cuándo persistir.
-    """
     events: List[Dict[str, Any]] = memory.get("events", [])
     if not events:
         return ZONE_YELLOW, TREND_FLAT
@@ -188,26 +139,15 @@ def evaluate_zone_and_trend(memory: Dict[str, Any]) -> Tuple[str, str]:
 
     return current_zone, trend
 
-
-# =========================
-# MODO CONTENCIÓN (TONO)
-# =========================
+# El modo contencion no cambia la zona, solo el tono y la recomendacion
 def build_feedback(
     memory: Dict[str, Any],
     zone: str,
     trend: str,
 ) -> Dict[str, str]:
-    """
-    Genera texto humano:
-    - comment: diagnóstico corto
-    - suggestion: siguiente paso sugerido
-
-    El modo contención NO cambia la zona,
-    solo cambia el tono y la recomendación.
-    """
     contencion = bool(memory.get("settings", {}).get("mode_contencion", False))
 
-    # Comentario base según zona
+    # Comentario base segun zona
     if zone == ZONE_GREEN:
         comment = "Se ve control y claridad en la decisión."
     elif zone == ZONE_YELLOW:
@@ -223,7 +163,7 @@ def build_feedback(
     else:
         comment += " Mantén el sistema simple."
 
-    # Sugerencia cambia según contención
+    # Sugerencia cambia segun contencion
     if contencion:
         if zone == ZONE_RED:
             suggestion = "¿Lo pausamos 48h y definimos solo qué cubrir primero?"

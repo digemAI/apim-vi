@@ -1,92 +1,66 @@
-# Permite usar anotaciones de tipos modernas (no afecta ejecución)
 from __future__ import annotations
-
-# Librería estándar para trabajar con archivos JSON
 import json
-
-# Utilidades para convertir dataclasses a diccionarios
 from dataclasses import asdict, is_dataclass
-
-# Para manejar fechas y horas
 from datetime import datetime
-
-# Para manejar rutas de archivos de forma segura
 from pathlib import Path
-
-# Tipos genéricos (solo para claridad)
 from typing import Any, Dict
 
-
-# =========================
-# UBICACIÓN DEL PROYECTO
-# =========================
+# Ubicacion del proyecto
 def _project_root() -> Path:
     """
-    Detecta la raíz del proyecto.
-    Espera esta estructura:
-
-      apim-vi/
-        apim_vi/  <- este archivo vive aquí
-        data/
+    Detecta la raiz del proyecto.
     """
-    # __file__ es la ruta de este archivo
-    # parents[1] sube dos niveles hasta la raíz del repo
+    # __file__ es la ruta de este archivo, parents[1] sube dos niveles hasta la raiz del repo
     return Path(__file__).resolve().parents[1]
 
-
-# =========================
-# CARPETA DE DATOS
-# =========================
+# Carpeta datos
 def _data_dir() -> Path:
+
     # Apunta a la carpeta /data
     d = _project_root() / "data"
 
-    # Si no existe, la crea automáticamente
+    # Si no existe, la crea automaticamente
     d.mkdir(parents=True, exist_ok=True)
 
     return d
 
-
-# =========================
-# RUTA DEL ARCHIVO DE MEMORIA
-# =========================
+# Ruta del archivo de memoria
 def _memory_path() -> Path:
+
     # data/apim_memory.json
     return _data_dir() / "apim_memory.json"
 
 
-# =========================
-# MEMORIA BASE (PRIMER USO)
-# =========================
+# Primer uso de la memoria base 
 def _default_memory() -> Dict[str, Any]:
-    # Esta es la estructura inicial del "cerebro" de APIM VI
+
+    # Estructura inicial del cerebro de APIM VI
     return {
         "user": {
-            "profile": None,              # perfil principal (ej. jefe de jefes)
-            "secondary_profile": None,    # opcional
+            "profile": None,              
+            "secondary_profile": None,    
         },
         "settings": {
-            "window": "weekly",           # ventana de análisis
-            "mode_contencion": False,     # modo contención ON / OFF
+            "window": "weekly",           
+            "mode_contencion": False,     
         },
-        "events": [],                    # eventos registrados
-        "weekly_snapshots": [],          # cierres semanales
-        "last_zone": None,               # última zona 🟢🟡🔴
-        "last_trend": None,              # última tendencia 📈➖📉
+        "events": [],                   
+        "weekly_snapshots": [],          
+        "last_zone": None,              
+        "last_trend": None,              
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
-        "schema_version": 1,             # versión del esquema
+        "schema_version": 1,             
     }
 
 
-# =========================
-# SERIALIZADOR SEGURO
-# =========================
+# Serializador
 def _json_safe(obj: Any) -> Any:
     """
     Convierte objetos no compatibles con JSON
     a algo que sí se pueda guardar.
     """
+
     # Si es una dataclass → dict
     if is_dataclass(obj):
         return asdict(obj)
@@ -105,13 +79,11 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
-# =========================
-# CARGAR MEMORIA
-# =========================
+# Cargar memoria
 def load_memory() -> Dict[str, Any]:
     """
     Carga la memoria desde data/apim_memory.json.
-    Si no existe (primer uso), la crea automáticamente.
+    Si no existe (primer uso), la crea automaticamente.
     """
     path = _memory_path()
 
@@ -126,8 +98,9 @@ def load_memory() -> Dict[str, Any]:
         with path.open("r", encoding="utf-8") as f:
             memory = json.load(f)
 
-    # Si el JSON está corrupto
+    # Si el json está corrupto
     except json.JSONDecodeError:
+
         # Se respalda el archivo roto
         backup = path.with_suffix(".corrupt.backup.json")
         path.rename(backup)
@@ -141,23 +114,17 @@ def load_memory() -> Dict[str, Any]:
     memory = _ensure_schema(memory)
     return memory
 
-
-# =========================
-# GUARDAR MEMORIA
-# =========================
+# Guardar memoria
 def save_memory(memory: Dict[str, Any]) -> None:
-    """
-    Guarda la memoria en JSON legible.
-    """
     path = _memory_path()
 
-    # Actualiza fecha de modificación
+    # Actualiza fecha de modificacion
     memory["updated_at"] = datetime.now().isoformat()
 
     # Asegura estructura completa
     memory = _ensure_schema(memory)
 
-    # Escribe el archivo JSON
+    # Escribe el archivo json
     with path.open("w", encoding="utf-8") as f:
         json.dump(
             memory,
@@ -167,15 +134,8 @@ def save_memory(memory: Dict[str, Any]) -> None:
             default=_json_safe
         )
 
-
-# =========================
-# ASEGURAR ESQUEMA
-# =========================
+# Si el json viene incompleto, rellena lo que falte sin borrar datos existentes.
 def _ensure_schema(memory: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Si el JSON viene incompleto, rellena
-    lo que falte sin borrar datos existentes.
-    """
     base = _default_memory()
 
     def merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
@@ -190,14 +150,8 @@ def _ensure_schema(memory: Dict[str, Any]) -> Dict[str, Any]:
     return merge(memory, base)
 
 
-# =========================
-# AGREGAR EVENTO
-# =========================
+# Agregar un evento a la memoria
 def add_event(memory: Dict[str, Any], event: Dict[str, Any]) -> None:
-    """
-    Agrega un evento a la memoria.
-    Normaliza campos mínimos.
-    """
     e = dict(event)
 
     # Valores por defecto si faltan
@@ -212,17 +166,10 @@ def add_event(memory: Dict[str, Any], event: Dict[str, Any]) -> None:
     memory["events"].append(e)
 
 
-# =========================
-# UTILIDADES (PRUEBAS)
-# =========================
+# Borra todos los eventos, solo para pruebas.
 def clear_events(memory: Dict[str, Any]) -> None:
-    """
-    Borra todos los eventos.
-    Solo para pruebas.
-    """
     memory["events"] = []
 
-
+# Devuelve copia de los eventos
 def get_events(memory: Dict[str, Any]) -> list[Dict[str, Any]]:
-    # Devuelve copia de los eventos
     return list(memory.get("events", []))

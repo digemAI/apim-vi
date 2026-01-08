@@ -1,18 +1,20 @@
 import streamlit as st
+import apim.dojo as dojo
 from apim.core import clasificar, recomendaciones
-from apim.dojo import demo_forward_pass
+from apim.dojo import demo_forward_pass, train_on_startup
+from apim.dojo import predict_v3
+from apim.storage import save_shadow
 from apim.storage import save_run, save_feedback
 
-
+# Para Genio / Jefe NO mostramos el botón, pero igual lo guardamos por si lo piden
 def debe_mostrar_principios(persona: str) -> bool:
-    # Para Genio / Jefe NO mostramos el botón, pero igual lo guardamos por si lo piden
     return persona not in ["Jefe de jefes", "Genio financiero"]
 
-
+# Configuracion basica 
 st.set_page_config(page_title="APIM VI", page_icon="💸", layout="centered")
 st.title("APIM VI - Test Financiero Inteligente")
 
-# FORM (solo inputs + submit)
+# Formulario
 with st.form("form_apim"):
     st.subheader("Ingresa tus respuestas")
 
@@ -24,7 +26,7 @@ with st.form("form_apim"):
     submitted = st.form_submit_button("Clasificar")
 
 
-# Al clasificar: calculamos y guardamos en sesión + historial JSON
+# Al clasificar calculamos y guardamos en sesión + historial JSON
 if submitted:
     respuestas = {
         "ahorro_mensual_pct": int(ahorro_pct),
@@ -32,19 +34,29 @@ if submitted:
         "registra_gastos": bool(registra),
         "fondo_emergencia_meses": int(fondo_meses),
     }
-
+# Clasificacion principal y recomendaciones personalizadas
     result = clasificar(respuestas)
     reco = recomendaciones(result.persona, respuestas)
 
+# Guardamos todo en sesion 
     st.session_state["respuestas"] = respuestas
     st.session_state["result"] = result
     st.session_state["reco"] = reco
     st.session_state["active_section"] = None
 
-    # Guardamos corrida en JSON y guardamos run_id para enlazar feedback
-    st.session_state["run_id"] = save_run(respuestas, result)
+    # Guardamos corrida una sola vez
+    run_id = save_run(respuestas, result)
+    st.session_state["run_id"] = run_id
 
-# Render del resultado (si existe)
+    # Prediccion silenciosa V3 en modo shadow
+    try:
+        v3_pred = predict_v3(respuestas)
+        save_shadow(run_id, result.persona, v3_pred)
+    except Exception:
+        pass
+
+
+# Resultados
 if "result" in st.session_state:
     result = st.session_state["result"]
     reco = st.session_state["reco"]
@@ -58,8 +70,7 @@ if "result" in st.session_state:
     st.subheader("Score APIM")
     st.write(result.score)
 
-    # Toques de IA (Dojo) - humano + con sabor
-
+    # Demo del Dojo explicativo y visual
     with st.expander("🤖 Toques de IA (Dojo)", expanded=False):
         salida, medidor = demo_forward_pass(respuestas)
         st.write("Señal del Dojo (demo):")
@@ -67,7 +78,7 @@ if "result" in st.session_state:
         st.write(f"Medidor de cercanía (demo): **{medidor:.4f}**")
 
 
-    # BOTONES (acciones/planes)
+    # Botones de acciones/planes
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -83,16 +94,17 @@ if "result" in st.session_state:
             st.session_state["active_section"] = "30"
 
     if debe_mostrar_principios(result.persona):
-        if st.button("📘 Principios (base)"):
+        if st.button(" Principios (base)"):
             st.session_state["active_section"] = "principios"
+           
+    if st.session_state.get("active_section") is None:
+        st.caption("Elige un botón arriba para ver el plan 👆")
 
-    # Render (abajo) según botón
-  
+    # Acciones y planes especificos
     st.markdown("## Recomendaciones accionables")
-
     active = st.session_state.get("active_section")
     if active is None:
-        st.caption("Elige un botón arriba para ver el plan 👆")
+        pass
     elif active == "hoy":
         st.markdown("### 3 acciones inmediatas (hoy):")
         for a in reco["acciones_inmediatas"]:
@@ -110,14 +122,14 @@ if "result" in st.session_state:
         for pr in reco["principios"]:
             st.markdown(f"- {pr}")
 
-    # Enfoque recomendado (armónico)
-    with st.expander("💡 Enfoque recomendado (según puntos débiles detectados)", expanded=True):
+    # Enfoque recomendado
+    with st.expander(" Enfoque recomendado (según puntos débiles detectados)", expanded=True):
         for e in reco["enfoque"]:
             st.markdown(f"- {e}")
 
-    # Feedback (se guarda en Data/historial.json)
+    # Feedback del usuario
     st.markdown("---")
-    st.subheader("✍️ Feedback rápido (para que esto aprenda después)")
+    st.subheader("✍️ Feedback rápido")
 
     rating = st.slider("¿Qué tan útil fue este resultado?", 1, 5, 4)
     comentario = st.text_input("Comentario opcional (1 línea):", "")
@@ -125,8 +137,7 @@ if "result" in st.session_state:
     if st.button("Guardar feedback"):
         if run_id:
             save_feedback(run_id, rating, comentario)
-            st.success("Listo ✅ Guardado. Esto alimenta el upgrade con PyTorch.")
+            st.success(" ✅ Gracias por tu respuesta")
         else:
             st.warning("Primero clasifica para generar un run_id.")
-
 

@@ -1,13 +1,8 @@
-# Permite anotaciones modernas de tipos
 from __future__ import annotations
-
-# Para timestamps de los snapshots
 from datetime import datetime
-
-# Tipos para claridad
 from typing import Any, Dict, List, Tuple
 
-# Importamos la lógica (NO guardamos aquí)
+# Importamos la logica
 from apim_vi.rules import (
     compute_zone,
     compute_trend,
@@ -17,44 +12,36 @@ from apim_vi.rules import (
     ZONE_RED,
 )
 
-
-# =========================
-# FUNCIONES AUXILIARES
-# =========================
+# Funciones auxiliares
 def _norm(s: str) -> str:
-    # Limpia texto (evita None y espacios)
+
+    # Limpia texto
     return (s or "").strip()
 
-
+# Obtiene un valor del dict y lo normaliza
 def _safe_get(d: Dict[str, Any], key: str, default: str = "") -> str:
-    # Obtiene un valor del dict y lo normaliza
     v = d.get(key, default)
     return _norm(str(v))
 
-
-# =========================
-# SELECCIÓN DE EVENTOS
-# =========================
+# Seleccion de eventos
 def _last_n_events(memory: Dict[str, Any], n: int = 5) -> List[Dict[str, Any]]:
-    # Toma los últimos N eventos de la memoria
+
+    # Toma los ultimos N eventos de la memoria
     events = memory.get("events", [])
     if not events:
         return []
     return events[-n:]
 
-
-# =========================
-# CONSTRUCCIÓN DE FILAS
-# =========================
+# Convierte eventos crudos en filas reportables:
 def _make_rows(events: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """
-    Convierte eventos crudos en filas reportables:
     Fecha | Evento | Monto | Contexto | Emoción | Zona | Tendencia
     """
     rows: List[Dict[str, str]] = []
     prev_zone = None
 
     for e in events:
+
         # Zona por evento
         z = compute_zone(e)
 
@@ -75,27 +62,20 @@ def _make_rows(events: List[Dict[str, Any]]) -> List[Dict[str, str]]:
 
     return rows
 
-
-# =========================
-# CONTEO DE ZONAS
-# =========================
+# Cuenta cuantos eventos cayeron en cada zona
 def _zone_counts(rows: List[Dict[str, str]]) -> Tuple[int, int, int]:
-    # Cuenta cuántos eventos cayeron en cada zona
     g = sum(1 for r in rows if r["zone"] == ZONE_GREEN)
     y = sum(1 for r in rows if r["zone"] == ZONE_YELLOW)
     r = sum(1 for r in rows if r["zone"] == ZONE_RED)
     return g, y, r
 
-
-# =========================
-# ZONA GLOBAL SEMANAL
-# =========================
+# Zona global semanal 
 def _overall_zone(rows: List[Dict[str, str]]) -> str:
     """
     Regla MVP para zona global semanal:
-    - ≥2 rojos → 🔴
+    - ≥ 2 rojos → 🔴
     - 1 rojo → 🟡 (hubo evento crítico)
-    - ≥2 amarillos → 🟡
+    - ≥ 2 amarillos → 🟡
     - resto → 🟢
     """
     g, y, r = _zone_counts(rows)
@@ -109,15 +89,8 @@ def _overall_zone(rows: List[Dict[str, str]]) -> str:
     return ZONE_GREEN
 
 
-# =========================
-# TENDENCIA GLOBAL
-# =========================
+# Compara la zona global actual contra, el último snapshot semanal si existe, si no, contra memory["last_zone"]
 def _overall_trend(memory: Dict[str, Any], overall_zone: str) -> str:
-    """
-    Compara la zona global actual contra:
-    - el último snapshot semanal si existe
-    - si no, contra memory["last_zone"]
-    """
     prev_zone = None
 
     snaps = memory.get("weekly_snapshots", [])
@@ -129,12 +102,10 @@ def _overall_trend(memory: Dict[str, Any], overall_zone: str) -> str:
 
     return compute_trend(prev_zone, overall_zone)
 
-
-# =========================
-# IMPRESIÓN DE TABLA
-# =========================
+# Impresion de tabla 
 def _print_table(rows: List[Dict[str, str]]) -> None:
-    # Encabezados y anchos fijos (CLI friendly)
+
+    # Encabezados y anchos fijos 
     headers = ["Fecha", "Evento", "Monto", "Contexto", "Emoción", "Zona", "Tend."]
     col_widths = [10, 24, 10, 18, 12, 4, 5]
 
@@ -145,7 +116,7 @@ def _print_table(rows: List[Dict[str, str]]) -> None:
             return t.ljust(width)
         return (t[: width - 1] + "…").ljust(width)
 
-    # Línea de encabezado
+    # Linea de encabezado
     line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
     sep = "-+-".join("-" * w for w in col_widths)
 
@@ -165,20 +136,13 @@ def _print_table(rows: List[Dict[str, str]]) -> None:
         ]))
 
 
-# =========================
-# REPORTE SEMANAL (API)
-# =========================
+# Usa los últimos N eventos, imprime tabla + resumen, ademas, guarda snapshot si se pide para generar el reporte semanal 
 def weekly_report(
     memory: Dict[str, Any],
     n_events: int = 5,
     save_snapshot: bool = True
 ) -> Dict[str, Any]:
-    """
-    Genera el reporte semanal:
-    - usa los últimos N eventos
-    - imprime tabla + resumen
-    - guarda snapshot si se pide
-    """
+
     events = _last_n_events(memory, n=n_events)
     if not events:
         print("\n📊 APIM VI — Reporte semanal")
@@ -193,10 +157,8 @@ def weekly_report(
     overall_zone = _overall_zone(rows)
     overall_trend = _overall_trend(memory, overall_zone)
 
-    # Texto humano (depende de modo contención)
+    # comentario + sugerencia según zona y tendencia
     fb = build_feedback(memory, overall_zone, overall_trend)
-
-    # Conteos
     g, y, r = _zone_counts(rows)
 
     # Resumen final

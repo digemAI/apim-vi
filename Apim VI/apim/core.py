@@ -2,26 +2,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Any, List
 
-# Estructura del resultado final que usa la app (Streamlit)
+# Estructura final que usa la app (Streamlit)
 @dataclass
 class Result:
     persona: str
     score: int
     resumen: str
 
-# 1) CLASIFICADOR PRINCIPAL (V1)
+# 1) Clasificador Principal (V1)
 def clasificar(respuestas: Dict[str, Any]) -> Result:
-    """
-    Reglas base (ajustables). La idea es que aquí viva tu 'cerebro' APIM VI.
-    """
     score = 0
- # Extraemos valores (con defaults por si faltan keys)
-    ahorro_pct = respuestas.get("ahorro_mensual_pct", 0)          # 0-50
-    compras_imp = respuestas.get("compras_impulsivas_sem", 0)     # 0-14
-    registra = respuestas.get("registra_gastos", False)           # bool
-    fondo_meses = respuestas.get("fondo_emergencia_meses", 0)     # 0-12
+ # Extraemos valores 
+    ahorro_pct = respuestas.get("ahorro_mensual_pct", 0)         
+    compras_imp = respuestas.get("compras_impulsivas_sem", 0)    
+    registra = respuestas.get("registra_gastos", False)          
+    fondo_meses = respuestas.get("fondo_emergencia_meses", 0)     
 
-# Ahorro: premiamos ahorrar al menos 10% y más todavía si >= 20%    
+# Ahorro: premiamos ahorrar al menos 10% y mas todavía si >= 20%    
     if ahorro_pct >= 10:
         score += 3
     if ahorro_pct >= 20:
@@ -59,17 +56,17 @@ def clasificar(respuestas: Dict[str, Any]) -> Result:
 
     return Result(persona=persona, score=score, resumen=resumen)
 
-# 2) DETECTOR DE DEBILIDADES (V2 helper)
+# 2) Detector de debilidades (V2)
 def detectar_debilidades(respuestas: Dict[str, Any]) -> List[str]:
     debilidades: List[str] = []
 
-# Convertimos a tipos seguros (por si viene string / int / etc.)
-    ahorro = int(respuestas.get("ahorro_mensual_pct", 0))                  # %
-    impulsivas = int(respuestas.get("compras_impulsivas_sem", 0))          # veces/semana
-    registra = bool(respuestas.get("registra_gastos", False))              # True/False
-    fondo = float(respuestas.get("fondo_emergencia_meses", 0))             # meses
+# Convertimos a tipos seguros 
+    ahorro = int(respuestas.get("ahorro_mensual_pct", 0))                  
+    impulsivas = int(respuestas.get("compras_impulsivas_sem", 0))          
+    registra = bool(respuestas.get("registra_gastos", False))             
+    fondo = float(respuestas.get("fondo_emergencia_meses", 0))             
 
-# Umbrales simples (ajustables)
+# Umbrales simples ajustables
     if impulsivas >= 3:
         debilidades.append("impulsivas")
 
@@ -86,17 +83,17 @@ def detectar_debilidades(respuestas: Dict[str, Any]) -> List[str]:
 
     return debilidades
 
-# 3) RECOMENDACIONES (V2)
+# 3) Recomendaciones (V2)
 def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
     """
-    V2 recomendaciones basadas en tus notas de educación financiera:
-    - Págate a ti primero / Ahorra 10–20%
+    V2 recomendaciones basadas en tus notas de educacion financiera:
+    - Pagate a ti primero / Ahorra 10–20%
     - Regla 48h para compras
     - 2 preguntas antes de gastar
     - Cuentas con destinos (10% juego, 10% libertad financiera, etc.)
     - Efecto compuesto: pequeñas decisiones + constancia + tiempo
     """
- # Primero detectamos debilidades (para enfoque personalizado)
+ # Primero detectamos debilidades para enfoque personalizado
     deb = detectar_debilidades(respuestas)
 
 # Reglas por persona
@@ -104,7 +101,7 @@ def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
         "Comprador impulsivo": {
             "acciones_inmediatas": [
                 "Aplica la regla de las 48 horas: no compres nada mayor a X monto sin dejar pasar 2 días.",
-                "Antes de comprar hazte 2 preguntas: 1) ¿Esto me hace más rico o más pobre? 2) ¿Lo quiero de verdad o solo para sentirme mejor?",
+                "Antes de comprar hazte 2 preguntas: 1) ¿Esto me hace mas rico o mas pobre? 2) ¿Lo quiero de verdad o solo para sentirme mejor?",
                 "Paga en efectivo siempre que puedas: duele más entregar billetes que deslizar la tarjeta.",
             ],
             "plan_7_dias": [
@@ -190,7 +187,7 @@ def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
 # Si llega una persona desconocida, caemos a "Ahorrador disciplinado"
     bloque = por_persona.get(persona, por_persona["Ahorrador disciplinado"])
 
-# Principios generales (aplican para todos, estilo "filosofía APIM")
+# Principios generales que aplican para todos
     principios: List[str] = [
         "Págate a ti primero: reserva una parte para ti antes de pagar a otros.",
         "Pequeñas elecciones acertadas + constancia + tiempo = diferencia radical (efecto compuesto).",
@@ -199,7 +196,7 @@ def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
         "Usa el dinero como herramienta para la vida que quieres, no como medidor de tu valor.",
     ]
 
-# Enfoque personalizado según debilidades detectadas
+# Enfoque personalizado segun debilidades detectadas
     enfoque: List[str] = []
     if "impulsivas" in deb:
         enfoque.append("Tu punto débil son las compras impulsivas: aplica la regla de 48h y las 2 preguntas antes de gastar.")
@@ -210,7 +207,7 @@ def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
     if "bajo_ahorro" in deb:
         enfoque.append("Tu nivel de ahorro es bajo: empieza con 5–10% y ve subiendo en cuanto puedas.")
 
- # Si no se detectó nada, lo dejamos en “optimización”
+ # Si no se detectó nada, lo dejamos en optimizacion
     if not enfoque:
         enfoque.append("No se detectan puntos débiles críticos: ahora toca optimizar y sostener lo que ya haces bien.")
 
