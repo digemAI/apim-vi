@@ -1,47 +1,41 @@
 # APIM VI — Test Financiero Inteligente 💸🤖
-Un mini test financiero hecho con Python y Streamlit, que clasifica tu perfil y te da planes accionables.
-Incluye un “Dojo” (demo de red neuronal básica con NumPy) para mostrar conceptos de redes neuronales desde código.
+Un mini test financiero hecho con Python, Streamlit, Pytorch que clasifica tu perfil y te da planes accionables.
+El sistema principal corre, guarda datos y aprende.
+La sección “Dojo” incluye elementos demo solo para explicar el proceso.
 
 # ¿Qué hace hoy?
-- Captura respuestas (hábitos financieros)
-- Clasifica tu perfil (v1)
-- Muestra:
-  - 3 acciones para hoy
-  - Plan 7 días
-  - Plan 30 días
-  - (Opcional) principios base
+- Captura hábitos financieros del usuario (ahorro, compras impulsivas, registro de gastos, fondo de emergencia).
+- Score APIM (V2): se calcula con reglas a partir de tus hábitos (más score = mejores hábitos).
+- En la seccion toques de ia(dojo), saldran dos datos:
+   * Señal del Dojo (demo): salida numérica interna de la red. No es una decisión.
+   * Medidor de cercanía (demo): indica qué tan bien respondió .
+- Muestra planes accionables (3 acciones hoy, plan de 7 días, 30 días).
+- Guarda historial completo de ejecuciones y feedback del usuario.
+- Ejecuta un modelo PyTorch (V3) en shadow mode:
+  - Predice sin afectar la clasificación principal.
+  - Guarda probabilidades, confidence y errores.
+- Calcula métricas offline para comparar V2 vs V3.
 
 # Toques de IA (Dojo)
-Hoy el proyecto incluye un “Dojo” de red neuronal sencilla hecha con NumPy:
-- Capas densas (Dense) (conectan todas tus entradas con varias “neuronas” para combinar señales y sacar una salida)
-- Pesos + sesgos (weights + bias) para ajustar decisiones
-- Activación ReLU (filtra lo que no sirve)
-- Forward pass (procesa tus respuestas y genera una salida)
-- Un “medidor de qué tan cerca estuvo” la salida (para explicar el concepto de mejora futura)
+- Demo (NumPy)
+- Dense (capas densas): combinan las entradas (ahorro, impulsivas, registro, fondo) para producir una salida interna.
+- ReLU (activación): recorta valores negativos a 0 para dejar pasar solo señal útil.
+- Forward pass: la red procesa las entradas y genera una salida numérica.
+- Señal del Dojo (demo): la salida interna de la red (no decide tu perfil).
+- Medidor de cercanía (demo): un número de referencia para visualizar “qué tan alineada” estuvo la salida (menor = mejor).
 
-No entrena aún. Es una demo
-
-# ¿Qué será después con PyTorch?
-Aquí es cuando "Dojo" cobra vida: una red que sí aprende con la práctica.
-
-- Backpropagation (backward) *(la red revisa en qué parte del camino se equivocó y qué necesita ajustar.)
-
-- Loss real (una medida clara de qué tan lejos estuvo del resultado ideal.)
-
-- Optimizer (el entrenador que ajusta los pesos):
-    Adam - ajusta de forma simple y directa, paso a paso.
-    SGD - ajusta de manera más fina y estable, usando “memoria” del recorrido.
-
-- Historial de respuestas (para que se adapte a la persona que lo usa y mejore con el tiempo)
-
-En palabras simples: con PyTorch, el Dojo deja de ser un póster bonito y se vuelve película
+# V3 (PyTorch, shadow mode)
+- Dataset + DataLoader: convierten el historial en batches para entrenamiento.
+- Red (nn.Linear + ReLU): arquitectura simple para clasificar perfiles.
+- Loss (CrossEntropyLoss): mide qué tan mal predice.
+- Optimizer (Adam): ajusta pesos para mejorar con el tiempo.
+- Softmax + confidence: convierte la salida en probabilidades y nivel de confianza.
+- Shadow mode: V3 predice y se registra, pero no cambia el resultado final (V2 decide).
 
 # Como correrlo en tu terminal 
   - Clonas el repositorio con tu maquina
   - Entra a la carpeta del proyecto (cd apim-vi)
-  - Crea un entorno virtua
+  - Crea un entorno virtual
   - Activa tu entorno virtual
   - Instala las dependencias
   - Ejecuta la aplicación (streamlit run app.py)
-
-
