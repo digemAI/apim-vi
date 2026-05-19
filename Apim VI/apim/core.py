@@ -1,215 +1,252 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Dict, Any, List
 
-# Estructura final que usa la app (Streamlit)
+from dataclasses import dataclass
+from typing import Any, Dict, List
+
+
+# Final result structure used by the Streamlit app.
 @dataclass
 class Result:
     persona: str
     score: int
     resumen: str
 
-# 1) Clasificador Principal (V1)
-def clasificar(respuestas: Dict[str, Any]) -> Result:
-    score = 0
- # Extraemos valores 
-    ahorro_pct = respuestas.get("ahorro_mensual_pct", 0)         
-    compras_imp = respuestas.get("compras_impulsivas_sem", 0)    
-    registra = respuestas.get("registra_gastos", False)          
-    fondo_meses = respuestas.get("fondo_emergencia_meses", 0)     
 
-# Ahorro: premiamos ahorrar al menos 10% y mas todavía si >= 20%    
+# 1) MAIN CLASSIFIER (V1)
+def clasificar(respuestas: Dict[str, Any]) -> Result:
+    """
+    Applies the base APIM VI rules and returns the user's financial profile.
+    """
+    score = 0
+
+    # Read input values with safe defaults in case some keys are missing.
+    ahorro_pct = respuestas.get("ahorro_mensual_pct", 0)          # 0-50
+    compras_imp = respuestas.get("compras_impulsivas_sem", 0)     # 0-14
+    registra = respuestas.get("registra_gastos", False)           # bool
+    fondo_meses = respuestas.get("fondo_emergencia_meses", 0)     # 0-12
+
+    # Savings: reward saving at least 10%, with an extra bonus at 20% or more.
     if ahorro_pct >= 10:
         score += 3
     if ahorro_pct >= 20:
         score += 2
 
-# Impulsivas: penalizamos si compras por impulso son frecuentes
+    # Impulse purchases: penalize frequent emotional spending.
     if compras_imp >= 3:
         score -= 3
     if compras_imp >= 7:
         score -= 2
 
-# Registro de gastos: premiamos si registras (porque controlas)
+    # Expense tracking: reward users who track their money flow.
     if registra:
         score += 2
 
-# Fondo de emergencia: premiamos un fondo >= 3 meses y más si >= 6
+    # Emergency fund: reward 3+ months, with an extra bonus at 6+ months.
     if fondo_meses >= 3:
         score += 3
     if fondo_meses >= 6:
         score += 2
 
-# Mapeo a persona
+    # Map the score into a financial profile.
     if score <= 0:
-        persona = "Comprador impulsivo"
-        resumen = "Tienes potencia, pero el dinero se te va en ráfagas. Vamos a domar eso."
+        persona = "Impulse Buyer"
+        resumen = (
+            "You have potential, but money leaves too fast through impulse decisions. "
+            "The goal is to control that pattern."
+        )
     elif 1 <= score <= 4:
-        persona = "Ahorrador disciplinado"
-        resumen = "Vas bien: constancia y dedicación, los dos ajustes con los que subes de liga."
+        persona = "Disciplined Saver"
+        resumen = (
+            "You are building solid habits. With consistency and a few adjustments, "
+            "your financial control can improve quickly."
+        )
     elif 5 <= score <= 7:
-        persona = "Genio financiero"
-        resumen = "Decides bien y sostienes hábitos. Siempre encontraras oportunidades."
+        persona = "Financial Strategist"
+        resumen = (
+            "You make solid decisions and maintain useful habits. "
+            "The next step is turning control into opportunity."
+        )
     else:
-        persona = "Jefe de jefes"
-        resumen = "Control total. Eres el villano final"
+        persona = "Money Boss"
+        resumen = (
+            "You show strong control. Now the challenge is to protect, optimize, "
+            "and scale what you are already doing well."
+        )
 
     return Result(persona=persona, score=score, resumen=resumen)
 
-# 2) Detector de debilidades (V2)
+
+# 2) WEAKNESS DETECTOR (V2 helper)
 def detectar_debilidades(respuestas: Dict[str, Any]) -> List[str]:
-    debilidades: List[str] = []
+    """
+    Detects the user's main financial weaknesses from the input answers.
+    """
+    weaknesses: List[str] = []
 
-# Convertimos a tipos seguros 
-    ahorro = int(respuestas.get("ahorro_mensual_pct", 0))                  
-    impulsivas = int(respuestas.get("compras_impulsivas_sem", 0))          
-    registra = bool(respuestas.get("registra_gastos", False))             
-    fondo = float(respuestas.get("fondo_emergencia_meses", 0))             
+    # Convert values to safe types before applying rules.
+    ahorro = int(respuestas.get("ahorro_mensual_pct", 0))                  # %
+    impulsivas = int(respuestas.get("compras_impulsivas_sem", 0))          # times/week
+    registra = bool(respuestas.get("registra_gastos", False))              # True/False
+    fondo = float(respuestas.get("fondo_emergencia_meses", 0))             # months
 
-# Umbrales simples ajustables
+    # Simple thresholds. These can be adjusted in future versions.
     if impulsivas >= 3:
-        debilidades.append("impulsivas")
+        weaknesses.append("impulse_spending")
 
     if not registra:
-        debilidades.append("sin_registro")
+        weaknesses.append("no_expense_tracking")
 
-# Aquí consideramos “sin fondo” si es < 1 mes
+    # Treat emergency fund as missing when it covers less than one month.
     if fondo < 1:
-        debilidades.append("sin_fondo")
+        weaknesses.append("no_emergency_fund")
 
- # Consideramos bajo ahorro si < 10%
+    # Treat savings as low when the user saves less than 10%.
     if ahorro < 10:
-        debilidades.append("bajo_ahorro")
+        weaknesses.append("low_savings")
 
-    return debilidades
+    return weaknesses
 
-# 3) Recomendaciones (V2)
+
+# 3) RECOMMENDATIONS (V2)
 def recomendaciones(persona: str, respuestas: Dict[str, Any]) -> Dict[str, Any]:
     """
-    V2 recomendaciones basadas en tus notas de educacion financiera:
-    - Pagate a ti primero / Ahorra 10–20%
-    - Regla 48h para compras
-    - 2 preguntas antes de gastar
-    - Cuentas con destinos (10% juego, 10% libertad financiera, etc.)
-    - Efecto compuesto: pequeñas decisiones + constancia + tiempo
-    """
- # Primero detectamos debilidades para enfoque personalizado
-    deb = detectar_debilidades(respuestas)
+    Builds personalized recommendations using basic financial education rules.
 
-# Reglas por persona
+    Main ideas:
+    - Pay yourself first.
+    - Save 10-20% when possible.
+    - Use a 48-hour rule before impulse purchases.
+    - Ask two questions before spending.
+    - Separate money by purpose.
+    - Use compounding: small decisions + consistency + time.
+    """
+    weaknesses = detectar_debilidades(respuestas)
+
+    # Recommendations by financial profile.
     por_persona: Dict[str, Dict[str, List[str]]] = {
-        "Comprador impulsivo": {
+        "Impulse Buyer": {
             "acciones_inmediatas": [
-                "Aplica la regla de las 48 horas: no compres nada mayor a X monto sin dejar pasar 2 días.",
-                "Antes de comprar hazte 2 preguntas: 1) ¿Esto me hace mas rico o mas pobre? 2) ¿Lo quiero de verdad o solo para sentirme mejor?",
-                "Paga en efectivo siempre que puedas: duele más entregar billetes que deslizar la tarjeta.",
+                "Apply the 48-hour rule: do not buy anything above your limit without waiting two days.",
+                "Before buying, ask yourself: 1) Does this make me richer or poorer? 2) Do I really want this, or am I trying to feel better?",
+                "Use cash when possible. Paying with physical money makes the decision more visible.",
             ],
             "plan_7_dias": [
-                "Día 1: Anota TODO lo que gastas (aunque sea en la app de notas).",
-                "Día 2: Identifica 3 gastos 100% emocionales y elimínalos esta semana.",
-                "Día 3: Pon un tope de gasto ‘por antojo’ y respétalo.",
-                "Día 4: Activa la regla de 48h en compras online/carrito.",
-                "Día 5: Revisa tu lista de gastos y marca cuáles te acercan o alejan de tus metas.",
-                "Día 6: Repite las 2 preguntas antes de cualquier gasto no esencial.",
-                "Día 7: Mira cuánto habrías gastado sin control y cuánto te ahorraste.",
+                "Day 1: Write down every expense, even if you only use your notes app.",
+                "Day 2: Identify three emotional expenses and remove them this week.",
+                "Day 3: Set a weekly limit for cravings or non-essential purchases.",
+                "Day 4: Apply the 48-hour rule to online carts and impulse purchases.",
+                "Day 5: Review your expenses and mark which ones move you closer to or away from your goals.",
+                "Day 6: Ask the two spending questions before any non-essential purchase.",
+                "Day 7: Review how much you avoided spending by adding friction to impulse decisions.",
             ],
             "plan_30_dias": [
-                "Define un % fijo para ahorro (mínimo 10%) y pásalo a otra cuenta al cobrar.",
-                "Empieza a construir un fondo de emergencia: meta inicial = 1 mes de gastos básicos.",
-                "Elige 1 meta clara (deuda, viaje, inversión inicial) y destina parte del ahorro directo a esa meta.",
+                "Define a fixed savings percentage, starting with at least 10% if possible.",
+                "Start building an emergency fund. First target: one month of basic expenses.",
+                "Choose one clear goal, such as debt reduction, an emergency fund, or a first investment.",
             ],
         },
-        "Ahorrador disciplinado": {
+        "Disciplined Saver": {
             "acciones_inmediatas": [
-                "Formaliza ‘págate a ti primero’: separa al menos el 10% de tu ingreso apenas cae.",
-                "Revisa tus gastos y elimina 1 suscripción o gasto que ya no tenga sentido.",
-                "Define por escrito tu meta principal (ej. fondo 3 meses / primera inversión / salir de deuda concreta).",
+                "Formalize the 'pay yourself first' habit: separate at least 10% of your income when it arrives.",
+                "Review your expenses and remove one subscription or recurring cost that no longer makes sense.",
+                "Write down your main financial goal, such as a three-month emergency fund, a first investment, or debt reduction.",
             ],
             "plan_7_dias": [
-                "Día 1: Haz un resumen simple: ingresos, gastos fijos, gastos variables.",
-                "Día 2: Ajusta tu % de ahorro y deja un monto definido para ‘jugar y divertirse’ (10%).",
-                "Día 3: Abre (o etiqueta) una cuenta para ‘libertad financiera’ (10% cuando se pueda).",
-                "Día 4: Identifica deudas caras y planea adelantarlas con parte de tus excedentes.",
-                "Día 5: Revisa si tus gastos reflejan lo que de verdad te importa.",
-                "Día 6: Ajusta topes de gasto por categoría (hogar, comida, ocio).",
-                "Día 7: Evalúa la semana: ¿qué hábito te dio más control? Duplícalo la próxima.",
+                "Day 1: Build a simple overview: income, fixed expenses, and variable expenses.",
+                "Day 2: Adjust your savings percentage and define a small amount for fun without guilt.",
+                "Day 3: Create or label an account for long-term financial freedom.",
+                "Day 4: Identify expensive debt and plan how to reduce it faster.",
+                "Day 5: Review whether your expenses reflect what actually matters to you.",
+                "Day 6: Set spending limits by category: home, food, transport, and leisure.",
+                "Day 7: Review the week and identify the habit that gave you the most control.",
             ],
             "plan_30_dias": [
-                "Apunta a ahorrar entre 10–20% de tu ingreso total.",
-                "Logra un primer hito de fondo de emergencia (1 mes de gastos básicos).",
-                "Aprende 1 cosa nueva de educación financiera por semana (libro, podcast, artículo) y aplícala.",
+                "Aim to save between 10% and 20% of your total income when possible.",
+                "Reach the first emergency fund milestone: one month of basic expenses.",
+                "Learn one financial education concept per week and apply it in a small way.",
             ],
         },
-        "Genio financiero": {
+        "Financial Strategist": {
             "acciones_inmediatas": [
-                "Pon por escrito tus porcentajes objetivo: necesidades, juego, libertad financiera, largo plazo, donativos.",
-                "Revisa comisiones e impuestos de tus productos actuales y elimina lo que drene más de lo que aporta.",
-                "Elige 1 vehículo de inversión simple (ej. fondo indexado de bajo costo) y define un monto mensual automático.",
+                "Write down your target percentages for needs, fun, long-term investing, and financial freedom.",
+                "Review fees and taxes from your current financial products and remove anything that drains more than it helps.",
+                "Choose one simple investment vehicle and define a monthly amount for it.",
             ],
             "plan_7_dias": [
-                "Día 1: Haz un miniestado financiero personal (activos, pasivos, ingresos, gastos).",
-                "Día 2: Clasifica tus gastos entre déficit (recorte) y excedente (para invertir).",
-                "Día 3: Ajusta tu presupuesto para que exista excedente INTENCIONAL cada mes.",
-                "Día 4: Define tu mezcla entre ingreso ganado, de portafolio y pasivo a largo plazo.",
-                "Día 5: Revisa si tus decisiones siguen el efecto compuesto: pequeñas mejoras + constancia.",
-                "Día 6: Evalúa riesgos y seguros (protege lo que ya construiste).",
-                "Día 7: Documenta aprendizajes y decide 1 mejora para el próximo mes.",
+                "Day 1: Build a personal financial snapshot: assets, liabilities, income, and expenses.",
+                "Day 2: Classify expenses into deficit areas and surplus areas.",
+                "Day 3: Adjust your budget so monthly surplus becomes intentional.",
+                "Day 4: Review the difference between earned income, portfolio income, and passive income.",
+                "Day 5: Review whether your decisions support compounding: small improvements repeated over time.",
+                "Day 6: Review risks and insurance to protect what you are building.",
+                "Day 7: Document what you learned and choose one improvement for next month.",
             ],
             "plan_30_dias": [
-                "Consolida un fondo de emergencia de al menos 1–3 meses.",
-                "Arranca o refuerza una estrategia de inversión diversificada enfocada en el largo plazo.",
-                "Crea un espacio semanal fijo para revisar números (ej. domingo 20 minutos) y tomar decisiones frías.",
+                "Consolidate an emergency fund of at least one to three months.",
+                "Start or reinforce a diversified long-term investment strategy.",
+                "Create a weekly money review habit, such as 20 minutes every Sunday.",
             ],
         },
-        "Jefe de jefes": {
+        "Money Boss": {
             "acciones_inmediatas": [
-                "Alinea tus decisiones de dinero con tu ‘para qué’ profundo (no solo con el número).",
-                "Define 1 gran objetivo (ej. libertad financiera X año) y 2 métricas que vas a monitorear.",
-                "Sistema: documenta tu flujo de dinero (qué entra, qué sale, qué construye activos).",
+                "Align your money decisions with your deeper purpose, not only with the number.",
+                "Define one major financial objective and two metrics you will monitor.",
+                "Document your money flow: what comes in, what goes out, and what builds assets.",
             ],
             "plan_7_dias": [
-                "Día 1: Revisa si tu tiempo está alineado con producir, proteger, presupuestar, apalancar y aprender.",
-                "Día 2: Pregunta: ¿estoy construyendo activos o solo sosteniendo gastos bonitos?",
-                "Día 3: Ajusta tus flujos para que los pasivos se paguen con activos, no con salario.",
-                "Día 4: Diseña 1 sistema de ingreso adicional (negocio, proyecto, skill).",
-                "Día 5: Evalúa tu círculo: ¿con quién hablas de dinero y qué mentalidad traen?",
-                "Día 6: Ajusta tu plan según tu energía, no según modas.",
-                "Día 7: Revisa si lo que estás haciendo te acerca a la vida que quieres, no solo al número que quieres.",
+                "Day 1: Review whether your time is aligned with producing, protecting, budgeting, leveraging, and learning.",
+                "Day 2: Ask yourself: am I building assets or only maintaining expensive habits?",
+                "Day 3: Adjust your flows so liabilities are supported by assets, not only by salary.",
+                "Day 4: Design one additional income system, such as a business, project, or skill.",
+                "Day 5: Review your circle: who do you talk to about money, and what mindset do they bring?",
+                "Day 6: Adjust your plan based on your energy and reality, not on trends.",
+                "Day 7: Review whether your actions move you closer to the life you want, not only the number you want.",
             ],
             "plan_30_dias": [
-                "Refuerza al menos 1 activo real (negocio, bienes raíces, activos en papel, propiedad intelectual).",
-                "Define un plan anual: metas, hitos trimestrales y chequeos mensuales.",
-                "Integra la educación financiera como hábito estable, no como ‘racha’.",
+                "Strengthen at least one real asset: business, real estate, paper assets, or intellectual property.",
+                "Define a yearly plan with goals, quarterly milestones, and monthly reviews.",
+                "Make financial education a stable habit, not a temporary streak.",
             ],
         },
     }
 
-# Si llega una persona desconocida, caemos a "Ahorrador disciplinado"
-    bloque = por_persona.get(persona, por_persona["Ahorrador disciplinado"])
+    # Fall back to Disciplined Saver if an unknown profile arrives.
+    bloque = por_persona.get(persona, por_persona["Disciplined Saver"])
 
-# Principios generales que aplican para todos
+    # General APIM principles. These apply to every profile.
     principios: List[str] = [
-        "Págate a ti primero: reserva una parte para ti antes de pagar a otros.",
-        "Pequeñas elecciones acertadas + constancia + tiempo = diferencia radical (efecto compuesto).",
-        "Antes de gastar pregúntate: ¿esto me hace más rico o más pobre? ¿Lo quiero de verdad o solo para sentirme mejor?",
-        "Nunca tomes decisiones de dinero importantes desde la emoción del momento.",
-        "Usa el dinero como herramienta para la vida que quieres, no como medidor de tu valor.",
+        "Pay yourself first: reserve part of your income before paying everyone else.",
+        "Small good decisions + consistency + time = a radical difference.",
+        "Before spending, ask yourself: does this make me richer or poorer? Do I really want it, or am I trying to feel better?",
+        "Never make important money decisions from the emotion of the moment.",
+        "Use money as a tool for the life you want, not as a measure of your value.",
     ]
 
-# Enfoque personalizado segun debilidades detectadas
+    # Personalized focus based on detected weaknesses.
     enfoque: List[str] = []
-    if "impulsivas" in deb:
-        enfoque.append("Tu punto débil son las compras impulsivas: aplica la regla de 48h y las 2 preguntas antes de gastar.")
-    if "sin_registro" in deb:
-        enfoque.append("No estás registrando tus gastos: 7 días de registro total te van a abrir los ojos.")
-    if "sin_fondo" in deb:
-        enfoque.append("No tienes fondo de emergencia: meta mínima, 1 mes de gastos básicos lo antes posible.")
-    if "bajo_ahorro" in deb:
-        enfoque.append("Tu nivel de ahorro es bajo: empieza con 5–10% y ve subiendo en cuanto puedas.")
 
- # Si no se detectó nada, lo dejamos en optimizacion
+    if "impulse_spending" in weaknesses:
+        enfoque.append(
+            "Your weak point is impulse spending: apply the 48-hour rule and ask the two spending questions before buying."
+        )
+    if "no_expense_tracking" in weaknesses:
+        enfoque.append(
+            "You are not tracking expenses: seven days of total tracking can make your money flow visible."
+        )
+    if "no_emergency_fund" in weaknesses:
+        enfoque.append(
+            "You do not have an emergency fund yet: your first target is one month of basic expenses."
+        )
+    if "low_savings" in weaknesses:
+        enfoque.append(
+            "Your savings level is low: start with 5-10% and increase it when possible."
+        )
+
+    # If no critical weakness is detected, focus on optimization.
     if not enfoque:
-        enfoque.append("No se detectan puntos débiles críticos: ahora toca optimizar y sostener lo que ya haces bien.")
+        enfoque.append(
+            "No critical weakness was detected. The next step is to optimize and protect what already works."
+        )
 
     return {
         "acciones_inmediatas": bloque["acciones_inmediatas"],
