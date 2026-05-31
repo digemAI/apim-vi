@@ -13,7 +13,7 @@ class Result:
 
 
 # 1) MAIN CLASSIFIER (V1)
-def clasificar(respuestas: Dict[str, Any]) -> Result:
+def classify (respuestas: Dict[str, Any]) -> Result:
     """
     Applies the base APIM VI rules and returns the user's financial profile.
     """
