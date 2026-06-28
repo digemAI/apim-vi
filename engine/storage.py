@@ -5,22 +5,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# carpeta raiz del proyecto
-ROOT = Path(__file__).resolve().parents[1]     
+# project root folder
+ROOT = Path(__file__).resolve().parents[1]
 
-# respeta carpeta "Data" 
-DATA_DIR = ROOT / "Data"                        
-HISTORY_FILE = DATA_DIR / "historial.json"
+# uses the existing "Data" folder
+DATA_DIR = ROOT / "Data"
+HISTORY_FILE = DATA_DIR / "history.json"
 
-# Devuelve la fecha y hora actual
+# Returns the current date and time
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-# Asegura que existe la carpeta
+# Ensures the folder exists
 def _ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Si el archivo no existe, devuelve lista vacía.  Si el JSON está corrupto, crea respaldo y reinicia
+# Returns an empty list if the file doesn't exist. If the JSON is corrupted, creates a backup and resets.
 def _load_events() -> List[Dict[str, Any]]:
     _ensure_data_dir()
 
@@ -31,12 +31,12 @@ def _load_events() -> List[Dict[str, Any]]:
         return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
 
-        # Si se corrompe el json, lo respaldamos y empezamos limpio
+        # If the JSON is corrupted, back it up and start fresh
         backup = HISTORY_FILE.with_suffix(".json.bak")
         HISTORY_FILE.replace(backup)
         return []
 
-# Guarda la lista completa de eventos en historial.json.
+# Saves the full list of events to history.json.
 def _save_events(events: List[Dict[str, Any]]) -> None:
     _ensure_data_dir()
     HISTORY_FILE.write_text(
@@ -44,8 +44,8 @@ def _save_events(events: List[Dict[str, Any]]) -> None:
         encoding="utf-8"
     )
 
-# Guarda una ejecución del sistema, registro del usuario, persona clasificada, puntuacion, resumen del resultado
-def save_run(respuestas: Dict[str, Any], result: Any) -> str:
+# Saves a system run: the user's answers, classified profile, score, and result summary
+def save_run(answers: Dict[str, Any], result: Any) -> str:
 
     run_id = str(uuid.uuid4())
 
@@ -54,32 +54,32 @@ def save_run(respuestas: Dict[str, Any], result: Any) -> str:
         "type": "run",
         "run_id": run_id,
         "ts": _now_iso(),
-        "respuestas": respuestas,
-        "resultado": {
-            "persona": getattr(result, "persona", ""),
+        "answers": answers,
+        "result": {
+            "profile": getattr(result, "profile", ""),
             "score": getattr(result, "score", None),
-            "resumen": getattr(result, "resumen", ""),
+            "summary": getattr(result, "summary", ""),
         }
     })
     _save_events(events)
     return run_id
 
-#  Guarda feedback del usuario (evaluacion numerica, texto libre opcional)
-def save_feedback(run_id: str, rating: int, comentario: str = "") -> None:
+# Saves user feedback (numeric rating, optional free text)
+def save_feedback(run_id: str, rating: int, comment: str = "") -> None:
     events = _load_events()
     events.append({
         "type": "feedback",
         "run_id": run_id,
         "ts": _now_iso(),
         "rating": int(rating),
-        "comentario": (comentario or "").strip()
+        "comment": (comment or "").strip()
     })
     _save_events(events)
 
 # V3
-# shadow = registro paralelo del modelo V3
+# shadow = parallel logging of the V3 model
 
-def save_shadow(run_id: str, v3_pred: Dict[str, Any], v2_persona: Optional[str] = None) -> None:
+def save_shadow(run_id: str, v3_pred: Dict[str, Any], v2_profile: Optional[str] = None) -> None:
     events = _load_events()
     event = {
         "type": "shadow",
@@ -87,10 +87,8 @@ def save_shadow(run_id: str, v3_pred: Dict[str, Any], v2_persona: Optional[str] 
         "ts": _now_iso(),
         "v3": v3_pred,
     }
-    if v2_persona is not None:
-        event["v2_persona"] = v2_persona
+    if v2_profile is not None:
+        event["v2_profile"] = v2_profile
 
     events.append(event)
     _save_events(events)
-
-
