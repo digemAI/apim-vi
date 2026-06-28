@@ -1,118 +1,110 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
-# Zonas financieras/emocionales
-ZONE_GREEN = "🟢"   # Control / estabilidad
-ZONE_YELLOW = "🟡"  # Friccion / alerta
-ZONE_RED = "🔴"     # Crisis / evento critico
+# Financial/emotional zones
+ZONE_GREEN = "🟢"   # Control / stability
+ZONE_YELLOW = "🟡"  # Friction / alert
+ZONE_RED = "🔴"     # Crisis / critical event
 
-# Tendencias (comparacion contra el pasado)
-TREND_UP = "📈"     # Mejora
-TREND_FLAT = "➖"   # Estable
-TREND_DOWN = "📉"   # Empeora
+# Trends (comparison against the past)
+TREND_UP = "📈"     # Improves
+TREND_FLAT = "➖"   # Stable
+TREND_DOWN = "📉"   # Worsens
 
 
-# Palabras clave  
-# Si aparece algo de aqui es rojo
+# Keywords
+# If any of these appear, it's red
 RED_KEYWORDS = {
-    "robo", "despido", "renuncia", "divorcio", "demanda", "fraude", 
-    "choque", "accidente", "hospital", "cirugía", "urgente", "deuda",
-    "no puedo pagar", "mínimo", "embargo", "crisis"
+    "theft", "stolen", "layoff", "fired", "resignation", "divorce", "lawsuit",
+    "fraud", "crash", "accident", "hospital", "surgery", "urgent", "debt",
+    "can't pay", "minimum payment", "repossession", "crisis"
 }
 
-# Señales de alerta, pero no crisis total
+# Warning signals, but not a full crisis
 YELLOW_KEYWORDS = {
-    "estrés", "estres", "incertidumbre", "ajuste", "apretado",
-    "imprevisto", "retraso", "tensión", "preocupación", "preocupacion"
+    "stress", "uncertainty", "adjustment", "tight",
+    "unexpected", "delay", "tension", "worry", "worried"
 }
 
-# Señales de control o planeacion
+# Signals of control or planning
 GREEN_KEYWORDS = {
-    "tranquilo", "tranquila", "controlado", "diversión", "diversion",
-    "planeado", "planificado", "estacional", "enfocado", "bien"
+    "calm", "under control", "fun",
+    "planned", "seasonal", "focused", "good"
 }
 
-# Traduce como te sentiste a una zona base
+# Maps how you felt to a base zone
 EMOTION_TO_ZONE = {
-    # verde
-    "tranquilo": ZONE_GREEN,
-    "tranquila": ZONE_GREEN,
-    "diversión": ZONE_GREEN,
-    "diversion": ZONE_GREEN,
-    "satisfacción": ZONE_GREEN,
-    "satisfaccion": ZONE_GREEN,
-    "en paz": ZONE_GREEN,
-    "enfocado": ZONE_GREEN,
+    # green
+    "calm": ZONE_GREEN,
+    "fun": ZONE_GREEN,
+    "satisfaction": ZONE_GREEN,
+    "at peace": ZONE_GREEN,
+    "focused": ZONE_GREEN,
 
-    # amarilla
-    "estrés": ZONE_YELLOW,
-    "estres": ZONE_YELLOW,
-    "preocupación": ZONE_YELLOW,
-    "preocupacion": ZONE_YELLOW,
-    "ansiedad": ZONE_YELLOW,
-    "tensión": ZONE_YELLOW,
+    # yellow
+    "stress": ZONE_YELLOW,
+    "worried": ZONE_YELLOW,
+    "anxiety": ZONE_YELLOW,
     "tension": ZONE_YELLOW,
 
-    # roja
-    "pánico": ZONE_RED,
-    "panico": ZONE_RED,
-    "enojo": ZONE_RED,
-    "miedo": ZONE_RED,
-    "culpa": ZONE_RED,
-    "conflictivo": ZONE_RED,
-    "desesperación": ZONE_RED,
-    "desesperacion": ZONE_RED,
+    # red
+    "panic": ZONE_RED,
+    "anger": ZONE_RED,
+    "fear": ZONE_RED,
+    "guilt": ZONE_RED,
+    "conflicted": ZONE_RED,
+    "despair": ZONE_RED,
 }
 
-# Funciones Auxiliares
+# Helper functions
 def _norm(s: str) -> str:
 
-    # Limpia texto, es decir, quita espacios y pasa a minusculas
+    # Cleans text: strips whitespace and lowercases it
     return (s or "").strip().lower()
 
-# Revisa si alguna palabra clave aparece en el texto
+# Checks whether any keyword appears in the text
 def _contains_any(text: str, keywords: set[str]) -> bool:
     t = _norm(text)
     return any(k in t for k in keywords)
 
-# Convierte zona a numero para comparar
+# Converts zone to a number for comparison
 def _zone_rank(z: str) -> int:
 
-    # rojo = 0 (peor), amarillo = 1, verde = 2 (mejor)
+    # red = 0 (worst), yellow = 1, green = 2 (best)
     return {ZONE_RED: 0, ZONE_YELLOW: 1, ZONE_GREEN: 2}.get(z, 1)
 
-# Convierte número de vuelta a zona
+# Converts the number back to a zone
 def _rank_to_zone(r: int) -> str:
     return {0: ZONE_RED, 1: ZONE_YELLOW, 2: ZONE_GREEN}.get(r, ZONE_YELLOW)
 
-# Zona de un evento usando emocion declarada, palabras clave en descripcion y contexto
+# Computes an event's zone using the stated emotion plus keywords in the description and context
 def compute_zone(event: Dict[str, Any]) -> str:
     desc = _norm(event.get("description", ""))
     ctx = _norm(event.get("context", ""))
-    amount = _norm(event.get("amount", ""))  # aún no pesa fuerte
+    amount = _norm(event.get("amount", ""))  # doesn't carry much weight yet
     emo = _norm(event.get("emotion", ""))
 
-    # 1) Prioridad absoluta: palabras rojas
+    # 1) Absolute priority: red keywords
     if _contains_any(desc, RED_KEYWORDS) or _contains_any(ctx, RED_KEYWORDS):
         return ZONE_RED
 
-    # 2) Zona base por emocion
+    # 2) Base zone from emotion
     if emo in EMOTION_TO_ZONE:
         base = EMOTION_TO_ZONE[emo]
     else:
-        base = ZONE_YELLOW  # neutral si no sabemos
+        base = ZONE_YELLOW  # neutral if we don't know
 
-    # 3) Ajustes suaves por palabras amarillas o verdes
+    # 3) Soft adjustments from yellow or green keywords
     if _contains_any(desc, YELLOW_KEYWORDS) or _contains_any(ctx, YELLOW_KEYWORDS):
         base = _rank_to_zone(min(_zone_rank(base), _zone_rank(ZONE_YELLOW)))
 
     if _contains_any(desc, GREEN_KEYWORDS) or _contains_any(ctx, GREEN_KEYWORDS):
         base = _rank_to_zone(max(_zone_rank(base), _zone_rank(ZONE_GREEN)))
 
-    # 4) El monto aun no manda (MVP)
+    # 4) The amount doesn't drive this yet (MVP)
     return base
 
-# Compara zona anterior vs actual para saber si mejora, empeora o sigue igual
+# Compares the previous zone vs the current one to see if things improve, worsen, or stay the same
 def compute_trend(prev_zone: str | None, current_zone: str) -> str:
     if not prev_zone:
         return TREND_FLAT
@@ -126,7 +118,7 @@ def compute_trend(prev_zone: str | None, current_zone: str) -> str:
         return TREND_DOWN
     return TREND_FLAT
 
-#   Calcula zona y tendencia usando el ultimo evento registrado y la ultima zona guardada en memoria
+# Computes zone and trend using the last recorded event and the last zone saved in memory
 def evaluate_zone_and_trend(memory: Dict[str, Any]) -> Tuple[str, str]:
     events: List[Dict[str, Any]] = memory.get("events", [])
     if not events:
@@ -139,44 +131,44 @@ def evaluate_zone_and_trend(memory: Dict[str, Any]) -> Tuple[str, str]:
 
     return current_zone, trend
 
-# El modo contencion no cambia la zona, solo el tono y la recomendacion
+# Containment mode doesn't change the zone, only the tone and the recommendation
 def build_feedback(
     memory: Dict[str, Any],
     zone: str,
     trend: str,
 ) -> Dict[str, str]:
-    contencion = bool(memory.get("settings", {}).get("mode_contencion", False))
+    containment_mode = bool(memory.get("settings", {}).get("containment_mode", False))
 
-    # Comentario base segun zona
+    # Base comment based on zone
     if zone == ZONE_GREEN:
-        comment = "Se ve control y claridad en la decisión."
+        comment = "This shows control and clarity in the decision."
     elif zone == ZONE_YELLOW:
-        comment = "Hay fricción; conviene priorizar estabilidad antes de optimizar."
+        comment = "There's friction; prioritize stability before optimizing."
     else:
-        comment = "Evento crítico: primero contención y continuidad."
+        comment = "Critical event: focus on containment and continuity first."
 
-    # Ajuste por tendencia
+    # Trend adjustment
     if trend == TREND_UP:
-        comment += " La recuperación va mejor."
+        comment += " The recovery is going well."
     elif trend == TREND_DOWN:
-        comment += " La presión subió; mejor bajar fricción."
+        comment += " Pressure went up; reduce friction."
     else:
-        comment += " Mantén el sistema simple."
+        comment += " Keep the system simple."
 
-    # Sugerencia cambia segun contencion
-    if contencion:
+    # Suggestion changes based on containment mode
+    if containment_mode:
         if zone == ZONE_RED:
-            suggestion = "¿Lo pausamos 48h y definimos solo qué cubrir primero?"
+            suggestion = "Should we pause for 48h and define only what to cover first?"
         elif zone == ZONE_YELLOW:
-            suggestion = "¿Quieres activar reglas mínimas de caja por 7 días?"
+            suggestion = "Want to activate minimum cash rules for 7 days?"
         else:
-            suggestion = "¿Marcamos esto como ‘planeado’ para no distorsionar el mes?"
+            suggestion = "Should we mark this as 'planned' so it doesn't distort the month?"
     else:
         if zone == ZONE_RED:
-            suggestion = "¿Quieres que prioricemos un plan de continuidad (lo urgente primero)?"
+            suggestion = "Want us to prioritize a continuity plan (urgent things first)?"
         elif zone == ZONE_YELLOW:
-            suggestion = "¿Te armo 2 opciones rápidas: recorte suave vs recorte fuerte?"
+            suggestion = "Want me to give you 2 quick options: soft cut vs hard cut?"
         else:
-            suggestion = "¿Lo marcamos como ‘estacional’ o ‘prioritario’ para reportes?"
+            suggestion = "Should we mark this as 'seasonal' or 'priority' for reports?"
 
     return {"comment": comment, "suggestion": suggestion}
