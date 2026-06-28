@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List
 
-# Convierte un valor a int y lo limita a un rango si la conversión falla, devuelve el valor por defecto.
+# Converts a value to int and clamps it to a range; falls back to the default if conversion fails.
 def clamp_int(value: Any, min_v: int, max_v: int, default: int) -> int:
     try:
         v = int(value)
@@ -12,7 +12,7 @@ def clamp_int(value: Any, min_v: int, max_v: int, default: int) -> int:
         return default
     return max(min_v, min(max_v, v))
 
-# Convierte un valor a float y lo limita a un rango si la conversión falla, devuelve el valor por defecto.
+# Converts a value to float and clamps it to a range; falls back to the default if conversion fails.
 def clamp_float(value: Any, min_v: float, max_v: float, default: float) -> float:
     try:
         v = float(value)
@@ -20,25 +20,25 @@ def clamp_float(value: Any, min_v: float, max_v: float, default: float) -> float
         return default
     return max(min_v, min(max_v, v))
 
-# Formatea cantidad como MXN con separador de miles y sin decimales
-def format_mxn(amount: float) -> str: 
+# Formats an amount as MXN with thousands separators and no decimals
+def format_mxn(amount: float) -> str:
     try:
         amt = float(amount)
     except (TypeError, ValueError):
         amt = 0.0
     return f"${amt:,.0f} MXN"
 
-#  Asegura que exista la carpeta data/ dentro del proyecto, si no existe, la crea. 
+# Ensures the Data/ folder exists inside the project; creates it if missing.
 def ensure_data_dir(project_root: Path) -> Path:
-    data_dir = project_root / "data"
+    data_dir = project_root / "Data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
-# Devuelve la ruta completa al archivo data/history.json.
+# Returns the full path to the Data/history.json file.
 def history_path(project_root: Path) -> Path:
     return ensure_data_dir(project_root) / "history.json"
 
-# Carga el historial desde data/history.json.  Si el archivo no existe o esta corrupto,  devuelve una lista vacia 
+# Loads history from Data/history.json. Returns an empty list if the file doesn't exist or is corrupted.
 def load_history(project_root: Path) -> List[Dict[str, Any]]:
     path = history_path(project_root)
     if not path.exists():
@@ -48,8 +48,7 @@ def load_history(project_root: Path) -> List[Dict[str, Any]]:
     except Exception:
         return []
 
-# Agrega un nuevo registro al historial en data/history.json.
-    history = load_history(project_root)
+# Adds a new record to history in Data/history.json.
 def append_history(project_root: Path, record: Dict[str, Any]) -> None:
     history = load_history(project_root)
     record = dict(record)
