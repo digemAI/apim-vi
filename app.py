@@ -1,143 +1,142 @@
 import streamlit as st
-import apim.dojo as dojo
-from apim.core import clasificar, recomendaciones
-from apim.dojo import demo_forward_pass, train_on_startup
-from apim.dojo import predict_v3
-from apim.storage import save_shadow
-from apim.storage import save_run, save_feedback
+import engine.dojo as dojo
+from engine.core import classify, recommendations
+from engine.dojo import demo_forward_pass, train_on_startup
+from engine.dojo import predict_v3
+from engine.storage import save_shadow
+from engine.storage import save_run, save_feedback
 
-# Para Genio / Jefe NO mostramos el botón, pero igual lo guardamos por si lo piden
-def debe_mostrar_principios(persona: str) -> bool:
-    return persona not in ["Jefe de jefes", "Genio financiero"]
+# We don't show the Principles button for Strategist / Boss, but we still store it in case it's needed later
+def should_show_principles(profile: str) -> bool:
+    return profile not in ["Money Boss", "Financial Strategist"]
 
-# Configuracion basica 
+# Basic configuration
 st.set_page_config(page_title="APIM VI", page_icon="💸", layout="centered")
-st.title("APIM VI - Test Financiero Inteligente")
+st.title("APIM VI - Smart Financial Test")
 
-# Formulario
-with st.form("form_apim"):
-    st.subheader("Ingresa tus respuestas")
+# Form
+with st.form("apim_form"):
+    st.subheader("Enter your answers")
 
-    ahorro_pct = st.slider("¿Qué % de tu ingreso ahorras al mes?", 0, 50, 10)
-    compras_imp = st.number_input("Compras impulsivas por semana", min_value=0, max_value=50, value=1, step=1)
-    registra = st.checkbox("Registro mis gastos (aunque sea en notas)")
-    fondo_meses = st.slider("Fondo de emergencia (meses cubiertos)", 0, 12, 3)
+    savings_pct = st.slider("What % of your income do you save monthly?", 0, 50, 10)
+    impulsive_purchases = st.number_input("Impulsive purchases per week", min_value=0, max_value=50, value=1, step=1)
+    tracks_expenses = st.checkbox("I track my expenses (even just in notes)")
+    fund_months = st.slider("Emergency fund (months covered)", 0, 12, 3)
 
-    submitted = st.form_submit_button("Clasificar")
+    submitted = st.form_submit_button("Classify")
 
 
-# Al clasificar calculamos y guardamos en sesión + historial JSON
+# When classifying, we compute and save to session + JSON history
 if submitted:
-    respuestas = {
-        "ahorro_mensual_pct": int(ahorro_pct),
-        "compras_impulsivas_sem": int(compras_imp),
-        "registra_gastos": bool(registra),
-        "fondo_emergencia_meses": int(fondo_meses),
+    answers = {
+        "monthly_savings_pct": int(savings_pct),
+        "impulsive_purchases_week": int(impulsive_purchases),
+        "tracks_expenses": bool(tracks_expenses),
+        "emergency_fund_months": int(fund_months),
     }
-# Clasificacion principal y recomendaciones personalizadas
-    result = clasificar(respuestas)
-    reco = recomendaciones(result.persona, respuestas)
+    # Main classification and personalized recommendations
+    result = classify(answers)
+    reco = recommendations(result.profile, answers)
 
-# Guardamos todo en sesion 
-    st.session_state["respuestas"] = respuestas
+    # Save everything to session
+    st.session_state["answers"] = answers
     st.session_state["result"] = result
     st.session_state["reco"] = reco
     st.session_state["active_section"] = None
 
-    # Guardamos corrida una sola vez
-    run_id = save_run(respuestas, result)
+    # Save the run once
+    run_id = save_run(answers, result)
     st.session_state["run_id"] = run_id
 
-    # Prediccion silenciosa V3 en modo shadow
+    # Silent V3 shadow prediction
     try:
-        v3_pred = predict_v3(respuestas)
-        save_shadow(run_id, result.persona, v3_pred)
+        v3_pred = predict_v3(answers)
+        save_shadow(run_id, v3_pred, result.profile)
     except Exception:
         pass
 
 
-# Resultados
+# Results
 if "result" in st.session_state:
     result = st.session_state["result"]
     reco = st.session_state["reco"]
-    respuestas = st.session_state["respuestas"]
+    answers = st.session_state["answers"]
     run_id = st.session_state.get("run_id", "")
 
-    st.subheader("Tu perfil")
-    st.write(result.persona)
-    st.caption(result.resumen)
+    st.subheader("Your profile")
+    st.write(result.profile)
+    st.caption(result.summary)
 
-    st.subheader("Score APIM")
+    st.subheader("APIM Score")
     st.write(result.score)
 
-    # Demo del Dojo explicativo y visual
-    with st.expander("🤖 Toques de IA (Dojo)", expanded=False):
-        salida, medidor = demo_forward_pass(respuestas)
-        st.write("Señal del Dojo (demo):")
-        st.code(str(salida))
-        st.write(f"Medidor de cercanía (demo): **{medidor:.4f}**")
+    # Explanatory, visual Dojo demo
+    with st.expander("🤖 AI Touches (Dojo)", expanded=False):
+        output, distance_score = demo_forward_pass(answers)
+        st.write("Dojo signal (demo):")
+        st.code(str(output))
+        st.write(f"Closeness score (demo): **{distance_score:.4f}**")
 
 
-    # Botones de acciones/planes
+    # Action/plan buttons
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("🔥 Acciones hoy", use_container_width=True):
-            st.session_state["active_section"] = "hoy"
+        if st.button("🔥 Actions today", use_container_width=True):
+            st.session_state["active_section"] = "today"
 
     with col2:
-        if st.button("🗓️ Plan 7 días", use_container_width=True):
+        if st.button("🗓️ 7-day plan", use_container_width=True):
             st.session_state["active_section"] = "7"
 
     with col3:
-        if st.button("📆 Plan 30 días", use_container_width=True):
+        if st.button("📆 30-day plan", use_container_width=True):
             st.session_state["active_section"] = "30"
 
-    if debe_mostrar_principios(result.persona):
-        if st.button(" Principios (base)"):
-            st.session_state["active_section"] = "principios"
-           
-    if st.session_state.get("active_section") is None:
-        st.caption("Elige un botón arriba para ver el plan 👆")
+    if should_show_principles(result.profile):
+        if st.button(" Principles (base)"):
+            st.session_state["active_section"] = "principles"
 
-    # Acciones y planes especificos
-    st.markdown("## Recomendaciones accionables")
+    if st.session_state.get("active_section") is None:
+        st.caption("Choose a button above to see the plan 👆")
+
+    # Specific actions and plans
+    st.markdown("## Actionable recommendations")
     active = st.session_state.get("active_section")
     if active is None:
         pass
-    elif active == "hoy":
-        st.markdown("### 3 acciones inmediatas (hoy):")
-        for a in reco["acciones_inmediatas"]:
+    elif active == "today":
+        st.markdown("### 3 immediate actions (today):")
+        for a in reco["immediate_actions"]:
             st.markdown(f"- {a}")
     elif active == "7":
-        st.markdown("### Plan para los próximos 7 días:")
-        for p in reco["plan_7_dias"]:
+        st.markdown("### Plan for the next 7 days:")
+        for p in reco["plan_7_days"]:
             st.markdown(f"- {p}")
     elif active == "30":
-        st.markdown("### Plan para los próximos 30 días:")
-        for p in reco["plan_30_dias"]:
+        st.markdown("### Plan for the next 30 days:")
+        for p in reco["plan_30_days"]:
             st.markdown(f"- {p}")
-    elif active == "principios":
-        st.markdown("### Principios financieros en los que se basa todo esto:")
-        for pr in reco["principios"]:
+    elif active == "principles":
+        st.markdown("### Financial principles behind all of this:")
+        for pr in reco["principles"]:
             st.markdown(f"- {pr}")
 
-    # Enfoque recomendado
-    with st.expander(" Enfoque recomendado (según puntos débiles detectados)", expanded=True):
-        for e in reco["enfoque"]:
+    # Recommended focus
+    with st.expander(" Recommended focus (based on detected weaknesses)", expanded=True):
+        for e in reco["focus"]:
             st.markdown(f"- {e}")
 
-    # Feedback del usuario
+    # User feedback
     st.markdown("---")
-    st.subheader("✍️ Feedback rápido")
+    st.subheader("✍️ Quick feedback")
 
-    rating = st.slider("¿Qué tan útil fue este resultado?", 1, 5, 4)
-    comentario = st.text_input("Comentario opcional (1 línea):", "")
+    rating = st.slider("How useful was this result?", 1, 5, 4)
+    comment = st.text_input("Optional comment (1 line):", "")
 
-    if st.button("Guardar feedback"):
+    if st.button("Save feedback"):
         if run_id:
-            save_feedback(run_id, rating, comentario)
-            st.success(" ✅ Gracias por tu respuesta")
+            save_feedback(run_id, rating, comment)
+            st.success(" ✅ Thanks for your feedback")
         else:
-            st.warning("Primero clasifica para generar un run_id.")
-
+            st.warning("Classify first to generate a run_id.")
