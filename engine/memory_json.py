@@ -5,71 +5,71 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-# Ubicacion del proyecto
+# Project location
 def _project_root() -> Path:
     """
-    Detecta la raiz del proyecto.
+    Detects the project root.
     """
-    # __file__ es la ruta de este archivo, parents[1] sube dos niveles hasta la raiz del repo
+    # __file__ is this file's path; parents[1] goes up two levels to the repo root
     return Path(__file__).resolve().parents[1]
 
-# Carpeta datos
+# Data folder
 def _data_dir() -> Path:
 
-    # Apunta a la carpeta /data
-    d = _project_root() / "data"
+    # Points to the Data folder
+    d = _project_root() / "Data"
 
-    # Si no existe, la crea automaticamente
+    # Creates it automatically if missing
     d.mkdir(parents=True, exist_ok=True)
 
     return d
 
-# Ruta del archivo de memoria
+# Path to the memory file
 def _memory_path() -> Path:
 
-    # data/apim_memory.json
-    return _data_dir() / "apim_memory.json"
+    # Data/memory.json
+    return _data_dir() / "memory.json"
 
 
-# Primer uso de la memoria base 
+# First-time default memory
 def _default_memory() -> Dict[str, Any]:
 
-    # Estructura inicial del cerebro de APIM VI
+    # Initial structure of APIM VI's brain
     return {
         "user": {
-            "profile": None,              
-            "secondary_profile": None,    
+            "profile": None,
+            "secondary_profile": None,
         },
         "settings": {
-            "window": "weekly",           
-            "mode_contencion": False,     
+            "window": "weekly",
+            "containment_mode": False,
         },
-        "events": [],                   
-        "weekly_snapshots": [],          
-        "last_zone": None,              
-        "last_trend": None,              
+        "events": [],
+        "weekly_snapshots": [],
+        "last_zone": None,
+        "last_trend": None,
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
-        "schema_version": 1,             
+        "schema_version": 1,
     }
 
 
-# Serializador
+# Serializer
 def _json_safe(obj: Any) -> Any:
     """
-    Convierte objetos no compatibles con JSON
-    a algo que sí se pueda guardar.
+    Converts objects that aren't JSON-compatible
+    into something that can be saved.
     """
 
-    # Si es una dataclass → dict
+    # If it's a dataclass → dict
     if is_dataclass(obj):
         return asdict(obj)
 
-    # Si es una ruta → string
+    # If it's a Path → string
     if isinstance(obj, (Path,)):
         return str(obj)
 
-    # Si tiene isoformat (datetime) → string
+    # If it has isoformat (datetime) → string
     if hasattr(obj, "isoformat"):
         try:
             return obj.isoformat()
@@ -79,52 +79,52 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
-# Cargar memoria
+# Load memory
 def load_memory() -> Dict[str, Any]:
     """
-    Carga la memoria desde data/apim_memory.json.
-    Si no existe (primer uso), la crea automaticamente.
+    Loads memory from Data/memory.json.
+    Creates it automatically on first use if missing.
     """
     path = _memory_path()
 
-    # Primer uso: no existe el archivo
+    # First use: file doesn't exist
     if not path.exists():
         memory = _default_memory()
         save_memory(memory)
         return memory
 
-    # Intentamos leer el archivo
+    # Try to read the file
     try:
         with path.open("r", encoding="utf-8") as f:
             memory = json.load(f)
 
-    # Si el json está corrupto
+    # If the JSON is corrupted
     except json.JSONDecodeError:
 
-        # Se respalda el archivo roto
+        # Back up the broken file
         backup = path.with_suffix(".corrupt.backup.json")
         path.rename(backup)
 
-        # Se crea una memoria nueva
+        # Create a fresh memory
         memory = _default_memory()
         save_memory(memory)
         return memory
 
-    # Si faltan llaves (compatibilidad futura)
+    # Fill in missing keys (forward compatibility)
     memory = _ensure_schema(memory)
     return memory
 
-# Guardar memoria
+# Save memory
 def save_memory(memory: Dict[str, Any]) -> None:
     path = _memory_path()
 
-    # Actualiza fecha de modificacion
+    # Update modification timestamp
     memory["updated_at"] = datetime.now().isoformat()
 
-    # Asegura estructura completa
+    # Ensure the structure is complete
     memory = _ensure_schema(memory)
 
-    # Escribe el archivo json
+    # Write the JSON file
     with path.open("w", encoding="utf-8") as f:
         json.dump(
             memory,
@@ -134,7 +134,7 @@ def save_memory(memory: Dict[str, Any]) -> None:
             default=_json_safe
         )
 
-# Si el json viene incompleto, rellena lo que falte sin borrar datos existentes.
+# If the JSON is incomplete, fill in what's missing without deleting existing data.
 def _ensure_schema(memory: Dict[str, Any]) -> Dict[str, Any]:
     base = _default_memory()
 
@@ -150,11 +150,11 @@ def _ensure_schema(memory: Dict[str, Any]) -> Dict[str, Any]:
     return merge(memory, base)
 
 
-# Agregar un evento a la memoria
+# Add an event to memory
 def add_event(memory: Dict[str, Any], event: Dict[str, Any]) -> None:
     e = dict(event)
 
-    # Valores por defecto si faltan
+    # Default values if missing
     e.setdefault("timestamp", datetime.now().isoformat())
     e.setdefault("date", "")
     e.setdefault("description", "")
@@ -166,10 +166,10 @@ def add_event(memory: Dict[str, Any], event: Dict[str, Any]) -> None:
     memory["events"].append(e)
 
 
-# Borra todos los eventos, solo para pruebas.
+# Clears all events, for testing only.
 def clear_events(memory: Dict[str, Any]) -> None:
     memory["events"] = []
 
-# Devuelve copia de los eventos
+# Returns a copy of the events
 def get_events(memory: Dict[str, Any]) -> list[Dict[str, Any]]:
     return list(memory.get("events", []))
