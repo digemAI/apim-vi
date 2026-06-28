@@ -2,8 +2,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
-# Importamos la logica
-from apim_vi.rules import (
+# Import core rule logic
+from engine.rules import (
     compute_zone,
     compute_trend,
     build_feedback,
@@ -12,40 +12,40 @@ from apim_vi.rules import (
     ZONE_RED,
 )
 
-# Funciones auxiliares
+# Helper functions
 def _norm(s: str) -> str:
 
-    # Limpia texto
+    # Cleans text
     return (s or "").strip()
 
-# Obtiene un valor del dict y lo normaliza
+# Gets a value from the dict and normalizes it
 def _safe_get(d: Dict[str, Any], key: str, default: str = "") -> str:
     v = d.get(key, default)
     return _norm(str(v))
 
-# Seleccion de eventos
+# Event selection
 def _last_n_events(memory: Dict[str, Any], n: int = 5) -> List[Dict[str, Any]]:
 
-    # Toma los ultimos N eventos de la memoria
+    # Takes the last N events from memory
     events = memory.get("events", [])
     if not events:
         return []
     return events[-n:]
 
-# Convierte eventos crudos en filas reportables:
+# Converts raw events into reportable rows:
 def _make_rows(events: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """
-    Fecha | Evento | Monto | Contexto | Emoción | Zona | Tendencia
+    Date | Event | Amount | Context | Emotion | Zone | Trend
     """
     rows: List[Dict[str, str]] = []
     prev_zone = None
 
     for e in events:
 
-        # Zona por evento
+        # Zone per event
         z = compute_zone(e)
 
-        # Tendencia dentro del reporte (comparando evento anterior)
+        # Trend within the report (compared to the previous event)
         t = compute_trend(prev_zone, z) if prev_zone else "➖"
 
         rows.append({
@@ -62,21 +62,21 @@ def _make_rows(events: List[Dict[str, Any]]) -> List[Dict[str, str]]:
 
     return rows
 
-# Cuenta cuantos eventos cayeron en cada zona
+# Counts how many events fell into each zone
 def _zone_counts(rows: List[Dict[str, str]]) -> Tuple[int, int, int]:
     g = sum(1 for r in rows if r["zone"] == ZONE_GREEN)
     y = sum(1 for r in rows if r["zone"] == ZONE_YELLOW)
     r = sum(1 for r in rows if r["zone"] == ZONE_RED)
     return g, y, r
 
-# Zona global semanal 
+# Weekly overall zone
 def _overall_zone(rows: List[Dict[str, str]]) -> str:
     """
-    Regla MVP para zona global semanal:
-    - ≥ 2 rojos → 🔴
-    - 1 rojo → 🟡 (hubo evento crítico)
-    - ≥ 2 amarillos → 🟡
-    - resto → 🟢
+    MVP rule for the weekly overall zone:
+    - >= 2 reds -> red
+    - 1 red -> yellow (there was a critical event)
+    - >= 2 yellows -> yellow
+    - otherwise -> green
     """
     g, y, r = _zone_counts(rows)
 
@@ -89,7 +89,7 @@ def _overall_zone(rows: List[Dict[str, str]]) -> str:
     return ZONE_GREEN
 
 
-# Compara la zona global actual contra, el último snapshot semanal si existe, si no, contra memory["last_zone"]
+# Compares the current overall zone against the last weekly snapshot if it exists, otherwise against memory["last_zone"]
 def _overall_trend(memory: Dict[str, Any], overall_zone: str) -> str:
     prev_zone = None
 
@@ -102,28 +102,28 @@ def _overall_trend(memory: Dict[str, Any], overall_zone: str) -> str:
 
     return compute_trend(prev_zone, overall_zone)
 
-# Impresion de tabla 
+# Table printing
 def _print_table(rows: List[Dict[str, str]]) -> None:
 
-    # Encabezados y anchos fijos 
-    headers = ["Fecha", "Evento", "Monto", "Contexto", "Emoción", "Zona", "Tend."]
+    # Headers and fixed widths
+    headers = ["Date", "Event", "Amount", "Context", "Emotion", "Zone", "Trend"]
     col_widths = [10, 24, 10, 18, 12, 4, 5]
 
-    # Corta texto largo para que no rompa la tabla
+    # Truncates long text so it doesn't break the table
     def cut(text: str, width: int) -> str:
         t = (text or "")
         if len(t) <= width:
             return t.ljust(width)
         return (t[: width - 1] + "…").ljust(width)
 
-    # Linea de encabezado
+    # Header line
     line = " | ".join(h.ljust(w) for h, w in zip(headers, col_widths))
     sep = "-+-".join("-" * w for w in col_widths)
 
     print("\n" + line)
     print(sep)
 
-    # Filas
+    # Rows
     for r in rows:
         print(" | ".join([
             cut(r["date"], col_widths[0]),
@@ -136,7 +136,7 @@ def _print_table(rows: List[Dict[str, str]]) -> None:
         ]))
 
 
-# Usa los últimos N eventos, imprime tabla + resumen, ademas, guarda snapshot si se pide para generar el reporte semanal 
+# Uses the last N events, prints table + summary, and saves a snapshot if requested to build the weekly report
 def weekly_report(
     memory: Dict[str, Any],
     n_events: int = 5,
@@ -145,32 +145,32 @@ def weekly_report(
 
     events = _last_n_events(memory, n=n_events)
     if not events:
-        print("\n📊 APIM VI — Reporte semanal")
-        print("No hay eventos registrados aún.")
+        print("\n📊 APIM VI — Weekly Report")
+        print("No events recorded yet.")
         return {"ok": False, "reason": "no_events"}
 
-    # Construimos filas y mostramos tabla
+    # Build rows and print the table
     rows = _make_rows(events)
     _print_table(rows)
 
-    # Zona y tendencia global
+    # Overall zone and trend
     overall_zone = _overall_zone(rows)
     overall_trend = _overall_trend(memory, overall_zone)
 
-    # comentario + sugerencia según zona y tendencia
+    # comment + suggestion based on zone and trend
     fb = build_feedback(memory, overall_zone, overall_trend)
     g, y, r = _zone_counts(rows)
 
-    # Resumen final
-    print("\n📌 Resumen semanal")
-    print(f"- Eventos analizados: {len(rows)}")
-    print(f"- Conteo zonas: 🟢{g}  🟡{y}  🔴{r}")
-    print(f"- Zona global: {overall_zone}")
-    print(f"- Tendencia: {overall_trend}")
+    # Final summary
+    print("\n📌 Weekly Summary")
+    print(f"- Events analyzed: {len(rows)}")
+    print(f"- Zone count: 🟢{g}  🟡{y}  🔴{r}")
+    print(f"- Overall zone: {overall_zone}")
+    print(f"- Trend: {overall_trend}")
     print(f"- Insight: {fb['comment']}")
-    print(f"- Sugerencia: {fb['suggestion']}")
+    print(f"- Suggestion: {fb['suggestion']}")
 
-    # Snapshot que se guarda en memoria
+    # Snapshot saved to memory
     snapshot = {
         "timestamp": datetime.now().isoformat(),
         "n_events": len(rows),
