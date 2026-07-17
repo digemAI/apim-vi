@@ -1,41 +1,34 @@
-# APIM VI — Test Financiero Inteligente 💸🤖
-Un mini test financiero hecho con Python, Streamlit, Pytorch que clasifica tu perfil y te da planes accionables.
-El sistema principal corre, guarda datos y aprende.
-La sección “Dojo” incluye elementos demo solo para explicar el proceso.
+# APIM VI 💸🤖
+Reads your financial habits and turns them into a profile you can actually act on — not just a score, but a plan. Where NEFILIM watches for signs of decline, APIM VI is the specialist: it evaluates, explains, and points you toward better financial decisions.
 
-# ¿Qué hace hoy?
-- Captura hábitos financieros del usuario (ahorro, compras impulsivas, registro de gastos, fondo de emergencia).
-- Score APIM (V2): se calcula con reglas a partir de tus hábitos (más score = mejores hábitos).
-- En la seccion toques de ia(dojo), saldran dos datos:
-   * Señal del Dojo (demo): salida numérica interna de la red. No es una decisión.
-   * Medidor de cercanía (demo): indica qué tan bien respondió .
-- Muestra planes accionables (3 acciones hoy, plan de 7 días, 30 días).
-- Guarda historial completo de ejecuciones y feedback del usuario.
-- Ejecuta un modelo PyTorch (V3) en shadow mode:
-  - Predice sin afectar la clasificación principal.
-  - Guarda probabilidades, confidence y errores.
-- Calcula métricas offline para comparar V2 vs V3.
+---
 
-# Toques de IA (Dojo)
-- Demo (NumPy)
-- Dense (capas densas): combinan las entradas (ahorro, impulsivas, registro, fondo) para producir una salida interna.
-- ReLU (activación): recorta valores negativos a 0 para dejar pasar solo señal útil.
-- Forward pass: la red procesa las entradas y genera una salida numérica.
-- Señal del Dojo (demo): la salida interna de la red (no decide tu perfil).
-- Medidor de cercanía (demo): un número de referencia para visualizar “qué tan alineada” estuvo la salida (menor = mejor).
+## The problem
 
-# V3 (PyTorch, shadow mode)
-- Dataset + DataLoader: convierten el historial en batches para entrenamiento.
-- Red (nn.Linear + ReLU): arquitectura simple para clasificar perfiles.
-- Loss (CrossEntropyLoss): mide qué tan mal predice.
-- Optimizer (Adam): ajusta pesos para mejorar con el tiempo.
-- Softmax + confidence: convierte la salida en probabilidades y nivel de confianza.
-- Shadow mode: V3 predice y se registra, pero no cambia el resultado final (V2 decide).
+Money, like mental health, is a topic most people avoid talking about — even though it shapes daily life more than almost anything else. Most financial tools either oversimplify ("save more") or overwhelm with numbers nobody understands. APIM VI exists to read real habits and turn them into something a person can actually act on today.
 
-# Como correrlo en tu terminal 
-  - Clonas el repositorio con tu maquina
-  - Entra a la carpeta del proyecto (cd apim-vi)
-  - Crea un entorno virtual
-  - Activa tu entorno virtual
-  - Instala las dependencias
-  - Ejecuta la aplicación (streamlit run app.py)
+---
+
+## What it does today
+
+Current version: **V3 — AI in shadow mode.**
+
+- **Habit capture**: savings, impulsive spending, expense tracking, and emergency fund — the core financial behaviors that shape a profile.
+- **APIM Score (V2)**: a rule-based score calculated from those habits — the better the habits, the higher the score.
+- **Actionable plans**: 3 actions for today, a 7-day plan, and a 30-day plan — not just a diagnosis, a path forward.
+- **Full history**: every run and every piece of user feedback is saved.
+- **PyTorch model (V3) in shadow mode**: a neural network predicts alongside the rule-based system without affecting the final classification — it logs probabilities, confidence, and errors, and its offline metrics are compared against V2 to see whether the model is actually adding value over the classic logic.
+
+## Where it's going
+
+Right now evaluates and predicts in the background. Next, it starts recommending with priority — pointing at the single habit worth working on first, not just describing all of them at once.
+
+---
+
+## Why I built it
+
+I wanted to do something real with the financial knowledge I already had — proof that you can take something you care about and turn it into something that helps someone else make a better decision with their money.
+
+**APIM**
+Aprende
+Improvisa
