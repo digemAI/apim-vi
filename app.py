@@ -1,6 +1,6 @@
 import streamlit as st
 import engine.dojo as dojo
-from engine.core import classify, recommendations
+from engine.core import classify, recommendations, compute_dimensions
 from engine.dojo import demo_forward_pass, train_on_startup
 from engine.dojo import predict_v3
 from engine.storage import save_shadow
@@ -37,11 +37,13 @@ if submitted:
     # Main classification and personalized recommendations
     result = classify(answers)
     reco = recommendations(result.profile, answers)
+    dimensions = compute_dimensions(answers)
 
     # Save everything to session
     st.session_state["answers"] = answers
     st.session_state["result"] = result
     st.session_state["reco"] = reco
+    st.session_state["dimensions"] = dimensions
     st.session_state["active_section"] = None
 
     # Save the run once
@@ -69,6 +71,17 @@ if "result" in st.session_state:
 
     st.subheader("APIM Score")
     st.write(result.score)
+
+    # Per-dimension breakdown (V2): shows why the score landed where it did.
+    dimensions = st.session_state.get("dimensions")
+    if dimensions:
+        st.subheader("📊 Dimension Breakdown")
+        for label, value in dimensions["scores"].items():
+            st.progress(value / 10, text=f"{label}: {value}/10")
+        st.caption(
+            f"Strength: **{dimensions['strongest_dimension']}** · "
+            f"To work on: **{dimensions['weakest_dimension']}**"
+        )
 
     # Explanatory, visual Dojo demo
     with st.expander("🤖 AI Touches (Dojo)", expanded=False):
