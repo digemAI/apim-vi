@@ -131,14 +131,14 @@ class FinancialDataset(Dataset):
 
             answers = record.get("answers", {})
             result = record.get("result", {})
-            persona_label = result.get("persona", "")
+            profile_label = result.get("profile", "")
 
-            if persona_label not in PROFILE_TO_ID:
+            if profile_label not in PROFILE_TO_ID:
                 continue
 
             x = _vectorize_answers_torch(answers)
             self.X.append(x)
-            self.y.append(PROFILE_TO_ID[persona_label])
+            self.y.append(PROFILE_TO_ID[profile_label])
 
     def __len__(self):
         return len(self.X)
