@@ -76,6 +76,100 @@ def classify(answers: Dict[str, Any]) -> Result:
     return Result(profile=profile, score=score, summary=summary)
 
 
+# Display labels for each scored dimension.
+DIMENSION_LABELS: Dict[str, str] = {
+    "expense_control": "Expense Control",
+    "savings": "Savings",
+    "foresight": "Foresight",
+    "discipline": "Discipline",
+    "decision_making": "Decision Making",
+}
+
+
+# 1b) DIMENSION SCORER (V2)
+def compute_dimensions(answers: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Scores each financial dimension independently on a 0-10 scale
+    and flags which one weighs most and which one drags the result down.
+
+    Note: with only four raw survey inputs, some dimensions share underlying
+    variables (e.g. impulsive purchases feeds both expense_control and
+    decision_making). A richer survey would let these separate further.
+    """
+    savings_pct = int(answers.get("monthly_savings_pct", 0))
+    impulsive = int(answers.get("impulsive_purchases_week", 0))
+    tracks = bool(answers.get("tracks_expenses", False))
+    fund = float(answers.get("emergency_fund_months", 0))
+
+    # Ahorro: rewards saving thresholds, mirrored from V1 but on a 0-10 scale.
+    savings_score = 0
+    if savings_pct >= 5:
+        savings_score += 3
+    if savings_pct >= 10:
+        savings_score += 3
+    if savings_pct >= 20:
+        savings_score += 4
+    savings_score = min(10, savings_score)
+
+    # Previsión: measures the emergency buffer, independent of the savings rate.
+    foresight_score = 0
+    if fund >= 1:
+        foresight_score += 3
+    if fund >= 3:
+        foresight_score += 3
+    if fund >= 6:
+        foresight_score += 4
+    foresight_score = min(10, foresight_score)
+
+    # Control de gastos: measures visibility over cash flow (tracking + low impulse frequency).
+    expense_control_score = 0
+    if tracks:
+        expense_control_score += 5
+    if impulsive < 3:
+        expense_control_score += 5
+    elif impulsive < 7:
+        expense_control_score += 2
+    expense_control_score = min(10, expense_control_score)
+
+    # Disciplina: measures sustained habits, combining tracking with consistent saving.
+    discipline_score = 0
+    if tracks:
+        discipline_score += 4
+    if savings_pct >= 10:
+        discipline_score += 3
+    if impulsive < 3:
+        discipline_score += 3
+    discipline_score = min(10, discipline_score)
+
+    # Toma de decisiones: isolates impulse-purchase frequency as a decision-quality signal.
+    decision_score = 10
+    if impulsive >= 3:
+        decision_score -= 3
+    if impulsive >= 5:
+        decision_score -= 3
+    if impulsive >= 7:
+        decision_score -= 4
+    decision_score = max(0, decision_score)
+
+    raw_scores: Dict[str, int] = {
+        "expense_control": expense_control_score,
+        "savings": savings_score,
+        "foresight": foresight_score,
+        "discipline": discipline_score,
+        "decision_making": decision_score,
+    }
+
+    # Picks the highest and lowest scoring dimensions to explain the "why" behind the result.
+    strongest_key = max(raw_scores, key=raw_scores.get)
+    weakest_key = min(raw_scores, key=raw_scores.get)
+
+    return {
+        "scores": {DIMENSION_LABELS[k]: v for k, v in raw_scores.items()},
+        "strongest_dimension": DIMENSION_LABELS[strongest_key],
+        "weakest_dimension": DIMENSION_LABELS[weakest_key],
+    }
+
+
 # 2) WEAKNESS DETECTOR (V2 helper)
 def detect_weaknesses(answers: Dict[str, Any]) -> List[str]:
     """
