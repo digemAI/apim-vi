@@ -51,7 +51,7 @@ def main() -> None:
 
     for s in shadows:
         v2 = s.get("v2_profile", "")
-        v3 = s.get("v3", {}).get("predicted_profile", "")
+        v3 = s.get("v3", {}).get("predicted_persona", "")
         conf = float(s.get("v3", {}).get("confidence", 0.0))
         confs.append(conf)
 
