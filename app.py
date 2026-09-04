@@ -36,15 +36,14 @@ if submitted:
     }
     # Main classification and personalized recommendations
     result = classify(answers)
-    reco = recommendations(result.profile, answers)
     dimensions = compute_dimensions(answers)
+    reco = recommendations(result.profile, answers, dimensions)
 
     # Save everything to session
     st.session_state["answers"] = answers
     st.session_state["result"] = result
     st.session_state["reco"] = reco
     st.session_state["dimensions"] = dimensions
-    st.session_state["active_section"] = None
 
     # Save the run once
     run_id = save_run(answers, result)
@@ -83,7 +82,9 @@ if "result" in st.session_state:
             f"To work on: **{dimensions['weakest_dimension']}**"
         )
 
-    # Explanatory, visual Dojo demo
+    # Explanatory, visual Dojo demo.
+    # Expander rule: supplementary/demo content starts collapsed (this one);
+    # user-actionable content (Priority focus, below) starts expanded.
     with st.expander("🤖 AI Touches (Dojo)", expanded=False):
         output, distance_score = demo_forward_pass(answers)
         st.write("Dojo signal (demo):")
@@ -91,52 +92,37 @@ if "result" in st.session_state:
         st.write(f"Closeness score (demo): **{distance_score:.4f}**")
 
 
-    # Action/plan buttons
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if st.button("🔥 Actions today", use_container_width=True):
-            st.session_state["active_section"] = "today"
-
-    with col2:
-        if st.button("🗓️ 7-day plan", use_container_width=True):
-            st.session_state["active_section"] = "7"
-
-    with col3:
-        if st.button("📆 30-day plan", use_container_width=True):
-            st.session_state["active_section"] = "30"
-
-    if should_show_principles(result.profile):
-        if st.button(" Principles (base)"):
-            st.session_state["active_section"] = "principles"
-
-    if st.session_state.get("active_section") is None:
-        st.caption("Choose a button above to see the plan 👆")
-
-    # Specific actions and plans
+    # Actionable recommendations, shown as tabs instead of hand-rolled toggle
+    # buttons: st.tabs() gives a native "which one is active" indicator for
+    # free and keeps the heading attached to content that's always visible.
     st.markdown("## Actionable recommendations")
-    active = st.session_state.get("active_section")
-    if active is None:
-        pass
-    elif active == "today":
-        st.markdown("### 3 immediate actions (today):")
+
+    tab_labels = ["🔥 Actions today", "🗓️ 7-day plan", "📆 30-day plan"]
+    if should_show_principles(result.profile):
+        tab_labels.append("📖 Principles")
+
+    tabs = st.tabs(tab_labels)
+
+    with tabs[0]:
         for a in reco["immediate_actions"]:
             st.markdown(f"- {a}")
-    elif active == "7":
-        st.markdown("### Plan for the next 7 days:")
+
+    with tabs[1]:
         for p in reco["plan_7_days"]:
             st.markdown(f"- {p}")
-    elif active == "30":
-        st.markdown("### Plan for the next 30 days:")
+
+    with tabs[2]:
         for p in reco["plan_30_days"]:
             st.markdown(f"- {p}")
-    elif active == "principles":
-        st.markdown("### Financial principles behind all of this:")
-        for pr in reco["principles"]:
-            st.markdown(f"- {pr}")
 
-    # Recommended focus
-    with st.expander(" Recommended focus (based on detected weaknesses)", expanded=True):
+    if should_show_principles(result.profile):
+        with tabs[3]:
+            for pr in reco["principles"]:
+                st.markdown(f"- {pr}")
+
+    # Priority focus (single weakest dimension, V4)
+    st.markdown("---")
+    with st.expander("🎯 Priority focus", expanded=True):
         for e in reco["focus"]:
             st.markdown(f"- {e}")
 
