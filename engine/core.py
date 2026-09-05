@@ -201,10 +201,42 @@ def detect_weaknesses(answers: Dict[str, Any]) -> List[str]:
     return weaknesses
 
 
-# 3) RECOMMENDATIONS (V2)
-def recommendations(profile: str, answers: Dict[str, Any]) -> Dict[str, Any]:
+# Dimension-specific priority: one focus message and one concrete first step
+# per dimension, used to adapt the plan to the user's actual weak point (V4).
+DIMENSION_ACTIONS: Dict[str, Dict[str, str]] = {
+    "Expense Control": {
+        "focus": "Your priority is expense visibility: you don't have a clear view of where your money goes.",
+        "priority_step": "Day 0: Track every expense for the next 7 days, even in a plain notes app.",
+    },
+    "Savings": {
+        "focus": "Your priority is savings: too little of your income is being set aside before it disappears.",
+        "priority_step": "Day 0: Set up an automatic transfer of at least 5% of your income the day you get paid.",
+    },
+    "Foresight": {
+        "focus": "Your priority is foresight: you don't have a buffer for the unexpected yet.",
+        "priority_step": "Day 0: Open a separate account or envelope and deposit your first emergency-fund amount today, however small.",
+    },
+    "Discipline": {
+        "focus": "Your priority is discipline: your habits aren't consistent enough yet to compound over time.",
+        "priority_step": "Day 0: Pick one money habit (tracking or saving) and commit to doing it daily for 7 days straight.",
+    },
+    "Decision Making": {
+        "focus": "Your priority is decision quality: impulse purchases are driving too many outcomes.",
+        "priority_step": "Day 0: Before any non-essential purchase this week, apply the 48-hour rule with no exceptions.",
+    },
+}
+
+
+# 3) RECOMMENDATIONS (V2 base, V4 prioritization)
+def recommendations(
+    profile: str,
+    answers: Dict[str, Any],
+    dimensions: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     """
-    Builds personalized recommendations using basic financial education rules.
+    Builds personalized recommendations using basic financial education rules,
+    then prioritizes a single focus and a first concrete step from the user's
+    weakest dimension (V4), if dimensions were computed.
 
     Main ideas:
     - Pay yourself first.
@@ -316,25 +348,40 @@ def recommendations(profile: str, answers: Dict[str, Any]) -> Dict[str, Any]:
         "Use money as a tool for the life you want, not as a measure of your value.",
     ]
 
-    # Personalized focus based on detected weaknesses.
-    focus: List[str] = []
+    # Personalized focus: prioritizes the single weakest dimension (V4) when
+    # compute_dimensions() was run, instead of listing every flagged weakness at once.
+    priority_dimension = None
+    plan_7_days = list(block["plan_7_days"])
 
-    if "impulse_spending" in weaknesses:
-        focus.append(
-            "Your weak point is impulse spending: apply the 48-hour rule and ask the two spending questions before buying."
-        )
-    if "no_expense_tracking" in weaknesses:
-        focus.append(
-            "You are not tracking expenses: seven days of total tracking can make your money flow visible."
-        )
-    if "no_emergency_fund" in weaknesses:
-        focus.append(
-            "You do not have an emergency fund yet: your first target is one month of basic expenses."
-        )
-    if "low_savings" in weaknesses:
-        focus.append(
-            "Your savings level is low: start with 5-10% and increase it when possible."
-        )
+    if dimensions:
+        priority_dimension = dimensions.get("weakest_dimension")
+        action = DIMENSION_ACTIONS.get(priority_dimension)
+        if action:
+            focus = [action["focus"]]
+            plan_7_days = [action["priority_step"]] + plan_7_days
+        else:
+            focus = []
+    else:
+        focus = []
+
+    # Fallback (no dimensions available): use the old flag-based focus list.
+    if not dimensions:
+        if "impulse_spending" in weaknesses:
+            focus.append(
+                "Your weak point is impulse spending: apply the 48-hour rule and ask the two spending questions before buying."
+            )
+        if "no_expense_tracking" in weaknesses:
+            focus.append(
+                "You are not tracking expenses: seven days of total tracking can make your money flow visible."
+            )
+        if "no_emergency_fund" in weaknesses:
+            focus.append(
+                "You do not have an emergency fund yet: your first target is one month of basic expenses."
+            )
+        if "low_savings" in weaknesses:
+            focus.append(
+                "Your savings level is low: start with 5-10% and increase it when possible."
+            )
 
     # If no critical weakness is detected, focus on optimization.
     if not focus:
@@ -344,8 +391,9 @@ def recommendations(profile: str, answers: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "immediate_actions": block["immediate_actions"],
-        "plan_7_days": block["plan_7_days"],
+        "plan_7_days": plan_7_days,
         "plan_30_days": block["plan_30_days"],
         "principles": principles,
         "focus": focus,
+        "priority_dimension": priority_dimension,
     }
